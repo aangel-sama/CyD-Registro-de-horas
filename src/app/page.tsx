@@ -45,12 +45,15 @@ export default function Home() {
     setTimeEntries([...timeEntries, newEntry]);
   };
 
-  const timeSummary = timeEntries.reduce((acc: { [project: string]: number }, entry) => {
-    acc[entry.project] = (acc[entry.project] || 0) + entry.hours;
+  const timeSummary = timeEntries.reduce((acc: { [project: string]: { [document: string]: number } }, entry) => {
+    if (!acc[entry.project]) {
+      acc[entry.project] = {};
+    }
+    acc[entry.project][entry.document] = (acc[entry.project][entry.document] || 0) + entry.hours;
     return acc;
   }, {});
 
-  const totalHours = Object.values(timeSummary).reduce((acc, hours) => acc + hours, 0);
+  const totalHours = timeEntries.reduce((acc, entry) => acc + entry.hours, 0);
 
   const handleSync = async () => {
     alert("Syncing with Google Drive...");
@@ -143,18 +146,22 @@ export default function Home() {
             <TableHeader>
               <TableRow>
                 <TableHead>Project</TableHead>
+                <TableHead>Document/Plan</TableHead>
                 <TableHead>Hours Worked</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {Object.entries(timeSummary).map(([project, hours]) => (
-                <TableRow key={project}>
-                  <TableCell>{project}</TableCell>
-                  <TableCell>{hours}</TableCell>
-                </TableRow>
+              {Object.entries(timeSummary).map(([project, documents]) => (
+                Object.entries(documents).map(([document, hours]) => (
+                  <TableRow key={`${project}-${document}`}>
+                    <TableCell>{project}</TableCell>
+                    <TableCell>{document}</TableCell>
+                    <TableCell>{hours}</TableCell>
+                  </TableRow>
+                ))
               ))}
               <TableRow>
-                <TableCell>Total</TableCell>
+                <TableCell colSpan={2}>Total</TableCell>
                 <TableCell>{totalHours}</TableCell>
               </TableRow>
             </TableBody>
