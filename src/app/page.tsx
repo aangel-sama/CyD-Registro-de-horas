@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { Calendar } from "@/components/ui/calendar";
 import {
   Card, CardContent, CardDescription, CardHeader, CardTitle
@@ -13,11 +13,11 @@ import {
 } from "@/components/ui/table";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
-
-import { format } from "date-fns";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { startOfWeek } from 'date-fns';
+import { format, startOfWeek } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
+
+type SummaryType = "daily" | "weekly" | "monthly";
 
 export default function Home() {
   const [projects] = useState(["Project A", "Project B", "Project C"]);
@@ -33,17 +33,15 @@ export default function Home() {
     { date: string; project: string; document: string; hours: number; description?: string; id: string }[]
   >([]);
 
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const { toast } = useToast();
 
   const fetchTimeEntries = async () => {
-    //  No Firebase needed
-    // Replaced with mock data loading
-    const mockTimeEntries = [
-      { id: "1", date: format(new Date(), "yyyy-MM-dd"), project: "Project A", document: "Document 1", hours: 3, description: "Mock Entry 1" },
-      { id: "2", date: format(new Date(), "yyyy-MM-dd"), project: "Project B", document: "Document 2", hours: 5, description: "Mock Entry 2" },
-    ];
-    setTimeEntries(mockTimeEntries);
+    //const mockTimeEntries = [
+    //  { id: "1", date: format(new Date(), "yyyy-MM-dd"), project: "Project A", document: "Document 1", hours: 3, description: "Mock Entry 1" },
+    //  { id: "2", date: format(new Date(), "yyyy-MM-dd"), project: "Project B", document: "Document 2", hours: 5, description: "Mock Entry 2" },
+    //];
+    //setTimeEntries(mockTimeEntries);
+    setTimeEntries([]);
   };
 
   useEffect(() => {
@@ -85,49 +83,146 @@ export default function Home() {
     return monthlySummary;
   }, [timeEntries]);
 
-  const getTotalHours = (summaryData: { [key: string]: number }) => {
-    return Object.values(summaryData).reduce((sum, hrs) => sum + hrs, 0);
-  };
+  const getDescriptions = useCallback(
+    (project: string, document: string, filterFn: (entry: any) => boolean) => {
+      return timeEntries
+        .filter(entry => entry.project === project && entry.document === document && filterFn(entry))
+        .map(entry => entry.description)
+        .join(", ");
+    },
+    [timeEntries]
+  );
 
-  const handleSubmit = async () => {
+  const getTotalHours = useCallback(
+    (summaryData: { [key: string]: number }) =>
+      Object.values(summaryData).reduce((sum, hrs) => sum + hrs, 0),
+    []
+  );
+
+  const handleSubmit = useCallback(() => {
     if (!date || !project || !document || !hours) {
-      setErrorMsg("Please fill in all fields.");
-      return;
-    }
-
-    try {
-      const newTimeEntry = {
-        date: format(date, "yyyy-MM-dd"),
-        project,
-        document,
-        hours,
-        description,
-        id: String(Date.now()), // Mock ID
-      };
-
-      setTimeEntries(prevEntries => [...prevEntries, newTimeEntry]);
-
-      setDate(new Date());
-      setHours(8);
-      setDescription("");
-      setErrorMsg(null);
-
-      toast({
-        title: "Success",
-        description: "Time entry added successfully.",
-      });
-
-      fetchTimeEntries(); // Refresh time entries after adding
-    } catch (error: any) {
-      console.error("Error adding time entry: ", error);
-      setErrorMsg(error.message);
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Failed to add time entry.",
+        description: "Please fill in all fields.",
       });
+      return;
     }
-  };
+
+    const newTimeEntry = {
+      id: Date.now().toString(),
+      date: format(date, "yyyy-MM-dd"),
+      project,
+      document,
+      hours,
+      description,
+    };
+
+    setTimeEntries(prev => [...prev, newTimeEntry]);
+    setDate(new Date());
+    setHours(8);
+    setDescription("");
+
+    toast({
+      title: "Success",
+      description: "Time entry added successfully.",
+    });
+  }, [date, project, document, hours, description, toast, setTimeEntries]);
+
+  const SummaryCard = useCallback(
+    ({
+      type,
+      title,
+      description,
+      summaryData,
+      dateFilter,
+    }: {
+      type: SummaryType;
+      title: string;
+      description: string;
+      summaryData: { [key: string]: number };
+      dateFilter: (entry: any) => boolean;
+    }) => {
+      return (
+        <Card>
+          <CardHeader>
+            <CardTitle>{title}</CardTitle>
+            <CardDescription>{description}</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Project</TableHead>
+                  <TableHead>Document/Plan</TableHead>
+                  <TableHead>Hours</TableHead>
+                  <TableHead>Description</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {Object.entries(summaryData).map(([key, hrs]) => {
+                  const [proj, doc] = key.split("-");
+                  return (
+                    <TableRow key={key}>
+                      <TableCell>{proj}</TableCell>
+                      <TableCell>{doc}</TableCell>
+                      <TableCell>{hrs}</TableCell>
+                      <TableCell>{getDescriptions(proj, doc, dateFilter)}</TableCell>
+                    </TableRow>
+                  );
+                })}
+                <TableRow>
+                  <TableCell colSpan={2}>Total</TableCell>
+                  <TableCell>{getTotalHours(summaryData)}</TableCell>
+                  <TableCell />
+                </TableRow>
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      );
+    },
+    [getDescriptions, getTotalHours]
+  );
+
+  const DailySummaryCard = useCallback(() => {
+    const dateFilter = (entry: any) => entry.date === format(new Date(), "yyyy-MM-dd");
+    return (
+      <SummaryCard
+        type="daily"
+        title="Daily Time Summary"
+        description="Summary of hours worked per project today."
+        summaryData={dailySummaryData}
+        dateFilter={dateFilter}
+      />
+    );
+  }, [dailySummaryData, SummaryCard]);
+
+  const WeeklySummaryCard = useCallback(() => {
+    const dateFilter = (entry: any) => new Date(entry.date) >= startOfWeek(new Date());
+    return (
+      <SummaryCard
+        type="weekly"
+        title="Weekly Time Summary"
+        description="Summary of hours worked per project this week."
+        summaryData={weeklySummaryData}
+        dateFilter={dateFilter}
+      />
+    );
+  }, [weeklySummaryData, SummaryCard]);
+
+  const MonthlySummaryCard = useCallback(() => {
+    const dateFilter = (entry: any) => entry.date.startsWith(format(new Date(), "yyyy-MM"));
+    return (
+      <SummaryCard
+        type="monthly"
+        title="Monthly Time Summary"
+        description="Summary of hours worked per project this month."
+        summaryData={monthlySummaryData}
+        dateFilter={dateFilter}
+      />
+    );
+  }, [monthlySummaryData, SummaryCard]);
 
   return (
     <div className="container mx-auto py-10 px-4">
@@ -141,26 +236,14 @@ export default function Home() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="date">Date</Label>
-                <Calendar
-                  id="date"
-                  mode="single"
-                  selected={date}
-                  onSelect={setDate}
-                  className="rounded-md border"
-                />
+                <Calendar id="date" mode="single" selected={date} onSelect={setDate} className="rounded-md border" />
               </div>
               <div>
                 <Label htmlFor="project">Project</Label>
                 <Select onValueChange={setProject} defaultValue={project} className="w-full">
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select a project" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {projects.map((p) => (
-                      <SelectItem key={p} value={p}>
-                        {p}
-                      </SelectItem>
-                    ))}
+                  <SelectTrigger className="w-full"><SelectValue placeholder="Select project" /></SelectTrigger>
+                  <SelectContent className="w-full">
+                    {projects.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
@@ -170,26 +253,15 @@ export default function Home() {
               <div>
                 <Label htmlFor="document">Document/Plan</Label>
                 <Select onValueChange={setDocument} defaultValue={document} className="w-full">
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select a document" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {documents.map((d) => (
-                      <SelectItem key={d} value={d}>
-                        {d}
-                      </SelectItem>
-                    ))}
+                  <SelectTrigger className="w-full"><SelectValue placeholder="Select document" /></SelectTrigger>
+                  <SelectContent className="w-full">
+                    {documents.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
               <div>
                 <Label htmlFor="hours">Hours Worked</Label>
-                <Input
-                  type="number"
-                  id="hours"
-                  value={hours}
-                  onChange={(e) => setHours(Number(e.target.value))}
-                />
+                <Input type="number" id="hours" value={hours} onChange={(e) => setHours(Number(e.target.value))} />
               </div>
             </div>
 
@@ -197,8 +269,8 @@ export default function Home() {
               <Label htmlFor="description">Description</Label>
               <Textarea
                 id="description"
-                value={description}
                 placeholder="Enter task description"
+                value={description}
                 onChange={(e) => setDescription(e.target.value)}
               />
             </div>
@@ -212,135 +284,12 @@ export default function Home() {
 
       <Separator className="my-6" />
 
-      {/* Daily Summary */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Daily Time Summary</CardTitle>
-          <CardDescription>Summary of hours worked per project today.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Project</TableHead>
-                <TableHead>Document/Plan</TableHead>
-                <TableHead>Hours</TableHead>
-                <TableHead>Description</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {Object.entries(dailySummaryData).map(([key, hrs]) => {
-                const [proj, doc] = key.split("-");
-                const descs = timeEntries
-                  .filter(e => e.project === proj && e.document === doc && e.date === format(new Date(), "yyyy-MM-dd"))
-                  .map(e => e.description)
-                  .join(", ");
-                return (
-                  <TableRow key={key}>
-                    <TableCell>{proj}</TableCell>
-                    <TableCell>{doc}</TableCell>
-                    <TableCell>{hrs}</TableCell>
-                    <TableCell>{descs}</TableCell>
-                  </TableRow>
-                );
-              })}
-              <TableRow>
-                <TableCell colSpan={2}>Total</TableCell>
-                <TableCell>{getTotalHours(dailySummaryData)}</TableCell>
-                <TableCell />
-              </TableRow>
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
-
+      <DailySummaryCard />
       <Separator className="my-6" />
-
-      {/* Weekly Summary */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Weekly Time Summary</CardTitle>
-          <CardDescription>Summary of hours worked per project this week.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Project</TableHead>
-                <TableHead>Document/Plan</TableHead>
-                <TableHead>Hours</TableHead>
-                <TableHead>Description</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {Object.entries(weeklySummaryData).map(([key, hrs]) => {
-                const [proj, doc] = key.split("-");
-                const descs = timeEntries
-                  .filter(e => e.project === proj && e.document === doc && new Date(e.date) >= startOfWeek(new Date()))
-                  .map(e => e.description)
-                  .join(", ");
-                return (
-                  <TableRow key={key}>
-                    <TableCell>{proj}</TableCell>
-                    <TableCell>{doc}</TableCell>
-                    <TableCell>{hrs}</TableCell>
-                    <TableCell>{descs}</TableCell>
-                  </TableRow>
-                );
-              })}
-              <TableRow>
-                <TableCell colSpan={2}>Total</TableCell>
-                <TableCell>{getTotalHours(weeklySummaryData)}</TableCell>
-                <TableCell />
-              </TableRow>
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
-
+      <WeeklySummaryCard />
       <Separator className="my-6" />
-
-      {/* Monthly Summary */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Monthly Time Summary</CardTitle>
-          <CardDescription>Summary of hours worked per project this month.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Project</TableHead>
-                <TableHead>Document/Plan</TableHead>
-                <TableHead>Hours</TableHead>
-                <TableHead>Description</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {Object.entries(monthlySummaryData).map(([key, hrs]) => {
-                const [proj, doc] = key.split("-");
-                const descs = timeEntries
-                  .filter(e => e.project === proj && e.document === doc && e.date.startsWith(format(new Date(), "yyyy-MM")))
-                  .map(e => e.description)
-                  .join(", ");
-                return (
-                  <TableRow key={key}>
-                    <TableCell>{proj}</TableCell>
-                    <TableCell>{doc}</TableCell>
-                    <TableCell>{hrs}</TableCell>
-                    <TableCell>{descs}</TableCell>
-                  </TableRow>
-                );
-              })}
-              <TableRow>
-                <TableCell colSpan={2}>Total</TableCell>
-                <TableCell>{getTotalHours(monthlySummaryData)}</TableCell>
-                <TableCell />
-              </TableRow>
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+      <MonthlySummaryCard />
     </div>
   );
 }
+
