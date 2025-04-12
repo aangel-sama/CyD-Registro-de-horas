@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Calendar } from "@/components/ui/calendar";
 import {
   Card, CardContent, CardDescription, CardHeader, CardTitle
@@ -16,7 +16,7 @@ import { Textarea } from "@/components/ui/textarea";
 
 import { format } from "date-fns";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { startOfWeek, startOfMonth } from 'date-fns';
+import { startOfWeek } from 'date-fns';
 import { useToast } from "@/hooks/use-toast";
 
 export default function Home() {
@@ -34,10 +34,6 @@ export default function Home() {
   >([]);
 
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [totalHours, setTotalHours] = useState(0);
-  const [dailySummaryData, setDailySummaryData] = useState<{ [key: string]: number }>({});
-  const [weeklySummaryData, setWeeklySummaryData] = useState<{ [key: string]: number }>({});
-  const [monthlySummaryData, setMonthlySummaryData] = useState<{ [key: string]: number }>({});
   const { toast } = useToast();
 
   const fetchTimeEntries = async () => {
@@ -54,36 +50,39 @@ export default function Home() {
     fetchTimeEntries();
   }, []);
 
-  useEffect(() => {
+  const dailySummaryData = useMemo(() => {
     let dailySummary: { [key: string]: number } = {};
-    let weeklySummary: { [key: string]: number } = {};
-    let monthlySummary: { [key: string]: number } = {};
-
     const todayStr = format(new Date(), "yyyy-MM-dd");
-    const currentMonth = todayStr.slice(0, 7);
-
     timeEntries.forEach((entry) => {
       const key = `${entry.project}-${entry.document}`;
-
-      // Daily Summary
       if (entry.date === todayStr) {
         dailySummary[key] = (dailySummary[key] || 0) + entry.hours;
       }
+    });
+    return dailySummary;
+  }, [timeEntries]);
 
-      // Weekly Summary
+  const weeklySummaryData = useMemo(() => {
+    let weeklySummary: { [key: string]: number } = {};
+    timeEntries.forEach((entry) => {
+      const key = `${entry.project}-${entry.document}`;
       if (new Date(entry.date) >= startOfWeek(new Date())) {
         weeklySummary[key] = (weeklySummary[key] || 0) + entry.hours;
       }
+    });
+    return weeklySummary;
+  }, [timeEntries]);
 
-      // Monthly Summary
-      if (entry.date.startsWith(currentMonth)) {
+  const monthlySummaryData = useMemo(() => {
+    let monthlySummary: { [key: string]: number } = {};
+    const todayStr = format(new Date(), "yyyy-MM");
+    timeEntries.forEach((entry) => {
+      const key = `${entry.project}-${entry.document}`;
+      if (entry.date.startsWith(todayStr)) {
         monthlySummary[key] = (monthlySummary[key] || 0) + entry.hours;
       }
     });
-
-    setDailySummaryData(dailySummary);
-    setWeeklySummaryData(weeklySummary);
-    setMonthlySummaryData(monthlySummary);
+    return monthlySummary;
   }, [timeEntries]);
 
   const getTotalHours = (summaryData: { [key: string]: number }) => {
