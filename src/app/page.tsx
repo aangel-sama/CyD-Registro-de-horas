@@ -15,9 +15,6 @@ import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { db } from "@/firebase/config";
 import { collection, query, where, getDocs, addDoc } from "firebase/firestore";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Icons } from "@/components/icons";
-import { toast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
@@ -55,7 +52,6 @@ export default function Home() {
 
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [totalHours, setTotalHours] = useState(0);
-  const [activeSummary, setActiveSummary] = useState<"daily" | "weekly" | "monthly">("daily");
   const [dailySummaryData, setDailySummaryData] = useState<{ [key: string]: number }>({});
   const [weeklySummaryData, setWeeklySummaryData] = useState<{ [key: string]: number }>({});
   const [monthlySummaryData, setMonthlySummaryData] = useState<{ [key: string]: number }>({});
@@ -174,32 +170,36 @@ export default function Home() {
               </div>
               <div>
                 <Label htmlFor="project">Project</Label>
-                <select
-                  id="project"
-                  value={project}
-                  onChange={(e) => setProject(e.target.value)}
-                  className="input"
-                >
-                  {projects.map((p) => (
-                    <option key={p} value={p}>{p}</option>
-                  ))}
-                </select>
+                <Select onValueChange={setProject} defaultValue={project}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select a project" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {projects.map((p) => (
+                      <SelectItem key={p} value={p}>
+                        {p}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="document">Document/Plan</Label>
-                <select
-                  id="document"
-                  value={document}
-                  onChange={(e) => setDocument(e.target.value)}
-                  className="input"
-                >
-                  {documents.map((d) => (
-                    <option key={d} value={d}>{d}</option>
-                  ))}
-                </select>
+                <Select onValueChange={setDocument} defaultValue={document}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select a document" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {documents.map((d) => (
+                      <SelectItem key={d} value={d}>
+                        {d}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div>
                 <Label htmlFor="hours">Hours Worked</Label>
