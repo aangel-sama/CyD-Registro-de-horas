@@ -18,7 +18,7 @@ import { collection, query, where, getDocs, addDoc } from "firebase/firestore";
 import { format } from "date-fns";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { db } from "@/firebase/config";
-import { startOfWeek } from 'date-fns';
+import { startOfWeek, startOfMonth } from 'date-fns';
 import { useToast } from "@/hooks/use-toast";
 
 // Firestore converter
