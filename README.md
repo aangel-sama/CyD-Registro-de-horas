@@ -1,5 +1,3 @@
-# Firebase Studio
+# CyD-Registro-de-horas
 
-This is a NextJS starter in Firebase Studio.
-
-To get started, take a look at src/app/page.tsx.
+Página web para registrar horas de trabajo.
