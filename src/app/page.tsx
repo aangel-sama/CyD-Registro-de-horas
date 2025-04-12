@@ -22,21 +22,24 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 
 const projects = ["Project A", "Project B", "Project C"]; // Example projects
+const documents = ["Document 1", "Document 2", "Document 3"]; // Example documents
 
 export default function Home() {
   const [date, setDate] = useState<Date | undefined>(new Date());
   const [project, setProject] = useState(projects[0]);
+  const [document, setDocument] = useState(documents[0]);
   const [hours, setHours] = useState<number | undefined>(8);
-  const [timeEntries, setTimeEntries] = useState<{ date: string; project: string; hours: number; }[]>([]);
+  const [timeEntries, setTimeEntries] = useState<{ date: string; project: string; document: string; hours: number; }[]>([]);
 
   const handleSubmit = () => {
-    if (!date || !project || !hours) {
+    if (!date || !project || !hours || !document) {
       alert("Please fill in all fields.");
       return;
     }
     const newEntry = {
       date: date.toISOString().slice(0, 10),
       project: project,
+      document: document,
       hours: hours,
     };
     setTimeEntries([...timeEntries, newEntry]);
@@ -96,6 +99,21 @@ export default function Home() {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
+              <Label htmlFor="document">Document/Plan</Label>
+              <select
+                id="document"
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                value={document}
+                onChange={(e) => setDocument(e.target.value)}
+              >
+                {documents.map((document) => (
+                  <option key={document} value={document}>
+                    {document}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
               <Label htmlFor="hours">Hours Worked</Label>
               <Input
                 type="number"
@@ -104,6 +122,8 @@ export default function Home() {
                 onChange={(e) => setHours(Number(e.target.value))}
               />
             </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
              <Label htmlFor="hours">Description</Label>
               <Textarea placeholder="Type your description here." />
