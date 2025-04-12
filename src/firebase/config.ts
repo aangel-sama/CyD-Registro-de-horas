@@ -19,16 +19,7 @@ const missingEnvVars = requiredEnvVars.filter(
   (key) => !process.env[key]
 );
 
-if (missingEnvVars.length > 0) {
-  console.error(
-    "Missing Firebase configuration values:",
-    missingEnvVars.join(", ")
-  );
-  // Commented out to prevent build failure, as the application requires these variables to function
-  // throw new Error(
-  //   "Missing Firebase configuration values. Ensure all required environment variables are set."
-  // );
-}
+
 
 // Firebase configuration
 const firebaseConfig = {

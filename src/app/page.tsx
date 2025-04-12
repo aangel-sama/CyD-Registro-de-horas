@@ -13,10 +13,13 @@ import {
 } from "@/components/ui/table";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
-import { db } from "@/firebase/config";
+
 import { collection, query, where, getDocs, addDoc } from "firebase/firestore";
 import { format } from "date-fns";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { db } from "@/firebase/config";
+import { startOfWeek } from 'date-fns';
+import { useToast } from "@/hooks/use-toast";
 
 // Firestore converter
 const timeEntryConverter = {
@@ -55,41 +58,7 @@ export default function Home() {
   const [dailySummaryData, setDailySummaryData] = useState<{ [key: string]: number }>({});
   const [weeklySummaryData, setWeeklySummaryData] = useState<{ [key: string]: number }>({});
   const [monthlySummaryData, setMonthlySummaryData] = useState<{ [key: string]: number }>({});
-
-  const handleSubmit = async () => {
-    if (!date || !project || !hours || isNaN(hours) || !document) {
-      toast({
-        title: "Error",
-        description: "Please fill in all fields correctly.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    const newEntry = {
-      date: format(date, "yyyy-MM-dd"),
-      project,
-      document,
-      hours,
-      description,
-    };
-
-    try {
-      await addDoc(collection(db, "timeEntries").withConverter(timeEntryConverter), newEntry);
-      fetchTimeEntries();
-      toast({
-        title: "Success",
-        description: "Time entry added successfully.",
-      });
-    } catch (e) {
-      console.error("Add Entry Error:", e);
-      toast({
-        title: "Error",
-        description: "Could not save time entry.",
-        variant: "destructive",
-      });
-    }
-  };
+  const { toast } = useToast();
 
   const fetchTimeEntries = async () => {
     const querySnapshot = await getDocs(collection(db, "timeEntries"));
@@ -137,15 +106,49 @@ export default function Home() {
     setMonthlySummaryData(monthlySummary);
   }, [timeEntries]);
 
-  const startOfWeek = (date: Date) => {
-    const d = new Date(date);
-    const day = d.getDay();
-    const diff = d.getDate() - day + (day === 0 ? -6 : 1); // Monday as start of week
-    return new Date(d.setDate(diff));
-  };
-
   const getTotalHours = (summaryData: { [key: string]: number }) => {
     return Object.values(summaryData).reduce((sum, hrs) => sum + hrs, 0);
+  };
+
+  const handleSubmit = async () => {
+    if (!date || !project || !document || !hours) {
+      setErrorMsg("Please fill in all fields.");
+      return;
+    }
+
+    try {
+      const newTimeEntry = {
+        date: format(date, "yyyy-MM-dd"),
+        project,
+        document,
+        hours,
+        description,
+      };
+
+      await addDoc(collection(db, "timeEntries"), newTimeEntry);
+
+      setTimeEntries(prevEntries => [...prevEntries, newTimeEntry]);
+
+      setDate(new Date());
+      setHours(8);
+      setDescription("");
+      setErrorMsg(null);
+
+      toast({
+        title: "Success",
+        description: "Time entry added successfully.",
+      });
+
+      fetchTimeEntries(); // Refresh time entries after adding
+    } catch (error: any) {
+      console.error("Error adding time entry: ", error);
+      setErrorMsg(error.message);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to add time entry.",
+      });
+    }
   };
 
   return (
@@ -170,7 +173,7 @@ export default function Home() {
               </div>
               <div>
                 <Label htmlFor="project">Project</Label>
-                <Select onValueChange={setProject} defaultValue={project}>
+                <Select onValueChange={setProject} defaultValue={project} className="w-full">
                   <SelectTrigger className="w-full">
                     <SelectValue placeholder="Select a project" />
                   </SelectTrigger>
@@ -188,7 +191,7 @@ export default function Home() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="document">Document/Plan</Label>
-                <Select onValueChange={setDocument} defaultValue={document}>
+                <Select onValueChange={setDocument} defaultValue={document} className="w-full">
                   <SelectTrigger className="w-full">
                     <SelectValue placeholder="Select a document" />
                   </SelectTrigger>
