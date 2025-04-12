@@ -14,7 +14,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { format, startOfWeek } from "date-fns";
+import { format, startOfWeek, getWeek } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 
 type SummaryType = "daily" | "weekly" | "monthly";
@@ -36,11 +36,6 @@ export default function Home() {
   const { toast } = useToast();
 
   const fetchTimeEntries = async () => {
-    //const mockTimeEntries = [
-    //  { id: "1", date: format(new Date(), "yyyy-MM-dd"), project: "Project A", document: "Document 1", hours: 3, description: "Mock Entry 1" },
-    //  { id: "2", date: format(new Date(), "yyyy-MM-dd"), project: "Project B", document: "Document 2", hours: 5, description: "Mock Entry 2" },
-    //];
-    //setTimeEntries(mockTimeEntries);
     setTimeEntries([]);
   };
 
@@ -63,7 +58,7 @@ export default function Home() {
   const weeklySummaryData = useMemo(() => {
     let weeklySummary: { [key: string]: number } = {};
     timeEntries.forEach((entry) => {
-      const key = `${entry.project}-${entry.document}`;
+      const key = `${entry.project}-${entry.document}-${format(new Date(entry.date), "EEE")}`;
       if (new Date(entry.date) >= startOfWeek(new Date())) {
         weeklySummary[key] = (weeklySummary[key] || 0) + entry.hours;
       }
@@ -75,7 +70,8 @@ export default function Home() {
     let monthlySummary: { [key: string]: number } = {};
     const todayStr = format(new Date(), "yyyy-MM");
     timeEntries.forEach((entry) => {
-      const key = `${entry.project}-${entry.document}`;
+      const weekNumber = getWeek(new Date(entry.date));
+      const key = `${entry.project}-${entry.document}-Semana ${weekNumber}`;
       if (entry.date.startsWith(todayStr)) {
         monthlySummary[key] = (monthlySummary[key] || 0) + entry.hours;
       }
@@ -161,13 +157,24 @@ export default function Home() {
               </TableHeader>
               <TableBody>
                 {Object.entries(summaryData).map(([key, hrs]) => {
-                  const [proj, doc] = key.split("-");
+                  let proj, doc, dayOrWeek;
+                  if (type === "weekly") {
+                    [proj, doc, dayOrWeek] = key.split("-");
+                  } else if (type === "monthly") {
+                    [proj, doc, dayOrWeek] = key.split("-");
+                  } else {
+                    [proj, doc] = key.split("-");
+                    dayOrWeek = "";
+                  }
                   return (
                     <TableRow key={key}>
                       <TableCell>{proj}</TableCell>
                       <TableCell>{doc}</TableCell>
                       <TableCell>{hrs}</TableCell>
-                      <TableCell>{getDescriptions(proj, doc, dateFilter)}</TableCell>
+                      <TableCell>
+                        {dayOrWeek ? `${dayOrWeek}: ` : ""}
+                        {getDescriptions(proj, doc, dateFilter)}
+                      </TableCell>
                     </TableRow>
                   );
                 })}
@@ -207,6 +214,7 @@ export default function Home() {
         description="Summary of hours worked per project this week."
         summaryData={weeklySummaryData}
         dateFilter={dateFilter}
+        type="weekly"
       />
     );
   }, [weeklySummaryData, SummaryCard]);
@@ -220,6 +228,7 @@ export default function Home() {
         description="Summary of hours worked per project this month."
         summaryData={monthlySummaryData}
         dateFilter={dateFilter}
+        type="monthly"
       />
     );
   }, [monthlySummaryData, SummaryCard]);
@@ -292,4 +301,5 @@ export default function Home() {
     </div>
   );
 }
+
 
