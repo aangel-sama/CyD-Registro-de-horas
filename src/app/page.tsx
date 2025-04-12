@@ -14,30 +14,10 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 
-import { collection, query, where, getDocs, addDoc } from "firebase/firestore";
 import { format } from "date-fns";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { db } from "@/firebase/config";
 import { startOfWeek, startOfMonth } from 'date-fns';
 import { useToast } from "@/hooks/use-toast";
-
-// Firestore converter
-const timeEntryConverter = {
-  toFirestore: (item: any) => ({
-    date: item.date,
-    project: item.project,
-    document: item.document,
-    hours: item.hours,
-    description: item.description,
-  }),
-  fromFirestore: (snapshot: any, options: any) => {
-    const data = snapshot.data(options);
-    return {
-      id: snapshot.id,
-      ...data,
-    };
-  },
-};
 
 export default function Home() {
   const [projects] = useState(["Project A", "Project B", "Project C"]);
@@ -61,13 +41,13 @@ export default function Home() {
   const { toast } = useToast();
 
   const fetchTimeEntries = async () => {
-    const querySnapshot = await getDocs(collection(db, "timeEntries"));
-    const fetchedEntries = querySnapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data(),
-    })) as any;
-
-    setTimeEntries(fetchedEntries);
+    //  No Firebase needed
+    // Replaced with mock data loading
+    const mockTimeEntries = [
+      { id: "1", date: format(new Date(), "yyyy-MM-dd"), project: "Project A", document: "Document 1", hours: 3, description: "Mock Entry 1" },
+      { id: "2", date: format(new Date(), "yyyy-MM-dd"), project: "Project B", document: "Document 2", hours: 5, description: "Mock Entry 2" },
+    ];
+    setTimeEntries(mockTimeEntries);
   };
 
   useEffect(() => {
@@ -123,9 +103,8 @@ export default function Home() {
         document,
         hours,
         description,
+        id: String(Date.now()), // Mock ID
       };
-
-      await addDoc(collection(db, "timeEntries"), newTimeEntry);
 
       setTimeEntries(prevEntries => [...prevEntries, newTimeEntry]);
 
