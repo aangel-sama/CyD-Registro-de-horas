@@ -32,12 +32,10 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   format,
   startOfWeek,
-  getWeek,
-  isSameDay,
-  isSameWeek,
-  isSameMonth,
-  parseISO,
+  endOfWeek,
   isWithinInterval,
+  isSameDay,
+  parseISO,
 } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
@@ -64,6 +62,18 @@ export default function Home() {
   const [showAlert, setShowAlert] = useState(false); // State to control the alert
   const [alertMessage, setAlertMessage] = useState(""); // State to control the alert
   const [isSubmitted, setIsSubmitted] = useState(false); // Track if the form is submitted
+  const [editMode, setEditMode] = useState(false); // Track if the form is in edit mode
+
+  const today = new Date();
+  const startOfCurrentWeek = startOfWeek(today);
+  const endOfCurrentWeek = endOfWeek(today);
+
+  const isValidDate = (date: Date) => {
+    return isWithinInterval(date, {
+      start: startOfCurrentWeek,
+      end: today,
+    });
+  };
 
   useEffect(() => {
     // Recalculate total hours whenever entries change
@@ -104,10 +114,12 @@ export default function Home() {
       hours: entry.hours,
     }));
 
-    setTimeEntries(newTimeEntries);
+    setTimeEntries([...timeEntries, ...newTimeEntries]);
     setIsSubmitted(true); // Set submitted status to true
     setEntries([{ project: projects[0], hours: 0 }]); // Reset entries to initial state
     setDate(new Date()); // Reset date to current date
+    setEditMode(false); // Reset edit mode
+
     toast({
       title: "Success",
       description: "Time entry added successfully.",
@@ -115,12 +127,13 @@ export default function Home() {
   };
 
   const handleEdit = () => {
+    setEditMode(true);
     setIsSubmitted(false);
   };
 
   const dailySummaryData = useMemo(() => {
     let dailySummary: { [key: string]: number } = {};
-    const todayStr = format(new Date(), "yyyy-MM-dd");
+    const todayStr = format(date, "yyyy-MM-dd");
     timeEntries.forEach((entry) => {
       if (entry.date === todayStr) {
         const key = `${entry.project}`;
@@ -128,12 +141,12 @@ export default function Home() {
       }
     });
     return dailySummary;
-  }, [timeEntries]);
+  }, [timeEntries, date]);
 
   const weeklySummaryData = useMemo(() => {
     const weeklySummary: { [key: string]: { [day: string]: number } } = {};
-    const start = startOfWeek(new Date());
-    const end = new Date();
+    const start = startOfWeek(date);
+    const end = date;
 
     timeEntries.forEach((entry) => {
       const entryDate = parseISO(entry.date);
@@ -149,7 +162,7 @@ export default function Home() {
       }
     });
     return weeklySummary;
-  }, [timeEntries]);
+  }, [timeEntries, date]);
 
   const monthlySummaryData = useMemo(() => {
     const monthlySummary: { [key: string]: { [week: string]: number } } = {};
@@ -284,7 +297,22 @@ export default function Home() {
                     selected={date}
                     onSelect={setDate}
                     className="rounded-md border"
+                    disabledDays={
+                      !isValidDate(date) && {
+                        before: startOfCurrentWeek,
+                        after: today,
+                      }
+                    }
                   />
+                  {!isValidDate(date) && (
+                    <Alert variant="destructive">
+                      <AlertTitle>Invalid Date</AlertTitle>
+                      <AlertDescription>
+                        You can only select dates from the current week up to
+                        today.
+                      </AlertDescription>
+                    </Alert>
+                  )}
                 </div>
               </div>
 
@@ -345,9 +373,7 @@ export default function Home() {
               {showAlert && (
                 <Alert variant="destructive">
                   <AlertTitle>Error</AlertTitle>
-                  <AlertDescription>
-                    {alertMessage}
-                  </AlertDescription>
+                  <AlertDescription>{alertMessage}</AlertDescription>
                 </Alert>
               )}
 
@@ -357,7 +383,9 @@ export default function Home() {
                     Add Project
                   </Button>
                 )}
-                <Button onClick={handleSubmit}>Add Time Entry</Button>
+                <Button onClick={handleSubmit} disabled={!isValidDate(date)}>
+                  Add Time Entry
+                </Button>
               </div>
             </>
           ) : (
