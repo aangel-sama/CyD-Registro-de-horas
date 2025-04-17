@@ -41,6 +41,7 @@ import {
   isWithinInterval,
 } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
+import { Badge } from "@/components/ui/badge";
 
 type Entry = {
   id: string;
@@ -62,6 +63,7 @@ export default function Home() {
   const [timeEntries, setTimeEntries] = useState<Entry[]>([]);
   const [totalHours, setTotalHours] = useState(0);
   const [showAlert, setShowAlert] = useState(false); // State to control the alert
+  const [alertMessage, setAlertMessage] = useState(""); // State to control the alert message
 
   useEffect(() => {
     // Recalculate total hours whenever entries change
@@ -87,8 +89,15 @@ export default function Home() {
   };
 
   const handleSubmit = () => {
-    if (totalHours !== 8) {
+    if (totalHours < 8) {
       setShowAlert(true); // Show the alert message
+      setAlertMessage("Total hours must be at least 8 hours.");
+      return;
+    }
+
+    if (totalHours > 8) {
+      setShowAlert(true); // Show the alert message
+      setAlertMessage("Total hours must be at most 8 hours.");
       return;
     }
 
@@ -319,6 +328,7 @@ export default function Home() {
                       updateEntry(index, "hours", value);
                     }
                   }}
+                  pattern="^[0-9]+(\.[0-9]{1,2})?$"
                 />
               </div>
               {entries.length > 1 && (
@@ -337,7 +347,7 @@ export default function Home() {
             <Alert variant="destructive">
               <AlertTitle>Error</AlertTitle>
               <AlertDescription>
-                Total hours must be exactly 8 hours.
+                {alertMessage}
               </AlertDescription>
             </Alert>
           )}
