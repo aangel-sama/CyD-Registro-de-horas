@@ -29,6 +29,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   format,
   startOfWeek,
@@ -46,7 +47,6 @@ type Entry = {
   date: string;
   project: string;
   hours: number;
-  document?: string;
 };
 
 type SummaryType = "daily" | "weekly" | "monthly";
@@ -56,51 +56,56 @@ export default function Home() {
 
   const [projects] = useState(["Project A", "Project B", "Project C"]);
   const [date, setDate] = useState<Date>(new Date());
-  const [project, setProject] = useState(projects[0]);
-  const [hours, setHours] = useState<number | undefined>(null);
+  const [entries, setEntries] = useState<
+    { project: string; hours: number }[]
+  >([{ project: projects[0], hours: 0 }]); // Start with one entry
   const [timeEntries, setTimeEntries] = useState<Entry[]>([]);
-  const [document, setDocument] = useState<string | undefined>(undefined);
+  const [totalHours, setTotalHours] = useState(0);
+  const [showAlert, setShowAlert] = useState(false); // State to control the alert
+
+  useEffect(() => {
+    // Recalculate total hours whenever entries change
+    const newTotalHours = entries.reduce((sum, entry) => sum + entry.hours, 0);
+    setTotalHours(newTotalHours);
+  }, [entries]);
+
+  const addEntry = () => {
+    //Add time entry
+    setEntries((prev) => [...prev, { project: projects[0], hours: 0 }]);
+  };
+
+  const updateEntry = (index: number, field: string, value: any) => {
+    setEntries((prev) => {
+      const newEntries = [...prev];
+      newEntries[index] = { ...newEntries[index], [field]: value };
+      return newEntries;
+    });
+  };
+
+  const removeEntry = (index: number) => {
+    setEntries((prev) => prev.filter((_, i) => i !== index));
+  };
 
   const handleSubmit = () => {
-    if (!date || !project || hours === undefined || hours === null) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Please fill in all fields.",
-      });
+    if (totalHours !== 8) {
+      setShowAlert(true); // Show the alert message
       return;
     }
 
-    const todayStr = format(date, "yyyy-MM-dd");
-    const dailyHours = timeEntries.filter(
-      (entry) => entry.date === todayStr
-    ).reduce((sum, entry) => sum + entry.hours, 0);
+    setShowAlert(false); // Ensure alert is hidden if conditions are met
 
-    if (dailyHours + hours > 8) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description:
-          "You can only add up to 8 hours per day. You have already added " +
-          dailyHours +
-          " hours today.",
-      });
-      return;
-    }
+    entries.forEach((entry) => {
+      const newEntry: Entry = {
+        id: Date.now().toString(),
+        date: format(date, "yyyy-MM-dd"),
+        project: entry.project,
+        hours: entry.hours,
+      };
+      setTimeEntries((prev) => [...prev, newEntry]);
+    });
 
-    const newEntry: Entry = {
-      id: Date.now().toString(),
-      date: format(date, "yyyy-MM-dd"),
-      project,
-      hours,
-      document,
-    };
-
-    setTimeEntries((prev) => [...prev, newEntry]);
+    setEntries([{ project: projects[0], hours: 0 }]);
     setDate(new Date());
-    setHours(null);
-    setDocument(undefined);
-
     toast({
       title: "Success",
       description: "Time entry added successfully.",
@@ -108,11 +113,11 @@ export default function Home() {
   };
 
   const dailySummaryData = useMemo(() => {
-    const dailySummary: { [key: string]: number } = {};
+    let dailySummary: { [key: string]: number } = {};
     const todayStr = format(new Date(), "yyyy-MM-dd");
     timeEntries.forEach((entry) => {
       if (entry.date === todayStr) {
-        const key = `${entry.project} - ${entry.document || "N/A"}`;
+        const key = `${entry.project}`;
         dailySummary[key] = (dailySummary[key] || 0) + entry.hours;
       }
     });
@@ -128,7 +133,7 @@ export default function Home() {
       const entryDate = parseISO(entry.date);
       if (isWithinInterval(entryDate, { start, end })) {
         const day = format(entryDate, "EEE");
-        const key = `${entry.project} - ${entry.document || "N/A"}`;
+        const key = `${entry.project}`;
 
         if (!weeklySummary[key]) {
           weeklySummary[key] = {};
@@ -152,7 +157,7 @@ export default function Home() {
         isWithinInterval(entryDate, { start: startOfMonth, end: endOfMonth })
       ) {
         const weekNumber = getWeek(entryDate, { weekStartsOn: 1 });
-        const key = `${entry.project} - ${entry.document || "N/A"}`;
+        const key = `${entry.project}`;
 
         if (!monthlySummary[key]) {
           monthlySummary[key] = {};
@@ -228,11 +233,21 @@ export default function Home() {
                       )
                     : type === "weekly"
                     ? Object.values(weeklySummaryData).reduce(
-                        (sum, days) => sum + Object.values(days).reduce((daySum, dayHours) => daySum + dayHours, 0),
+                        (sum, days) =>
+                          sum +
+                          Object.values(days).reduce(
+                            (daySum, dayHours) => daySum + dayHours,
+                            0
+                          ),
                         0
                       )
                     : Object.values(monthlySummaryData).reduce(
-                        (sum, weeks) => sum + Object.values(weeks).reduce((weekSum, weekHours) => weekSum + weekHours, 0),
+                        (sum, weeks) =>
+                          sum +
+                          Object.values(weeks).reduce(
+                            (weekSum, weekHours) => weekSum + weekHours,
+                            0
+                          ),
                         0
                       )}
                 </TableCell>
@@ -263,40 +278,76 @@ export default function Home() {
                 className="rounded-md border"
               />
             </div>
-            <div>
-              <Label htmlFor="project">Project</Label>
-              <Select onValueChange={setProject} defaultValue={project}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select project" />
-                </SelectTrigger>
-                <SelectContent>
-                  {projects.map((p) => (
-                    <SelectItem key={p} value={p}>
-                      {p}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="hours">Hours Worked</Label>
-              <Input
-                type="number"
-                id="hours"
-                placeholder="Enter hours"
-                value={hours !== null && hours !== undefined ? hours.toString() : ""}
-                onChange={(e) => {
-                  const value = Number(e.target.value);
-                  setHours(isNaN(value) ? null : value);
-                }}
-              />
+          {entries.map((entry, index) => (
+            <div
+              key={index}
+              className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center"
+            >
+              <div>
+                <Label htmlFor={`project-${index}`}>Project</Label>
+                <Select
+                  id={`project-${index}`}
+                  onValueChange={(value) =>
+                    updateEntry(index, "project", value)
+                  }
+                  defaultValue={entry.project}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select project" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {projects.map((p) => (
+                      <SelectItem key={p} value={p}>
+                        {p}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor={`hours-${index}`}>Hours Worked</Label>
+                <Input
+                  type="number"
+                  id={`hours-${index}`}
+                  placeholder="Enter hours"
+                  value={entry.hours.toString()}
+                  onChange={(e) => {
+                    const value = Number(e.target.value);
+                    if (!isNaN(value)) {
+                      updateEntry(index, "hours", value);
+                    }
+                  }}
+                />
+              </div>
+              {entries.length > 1 && (
+                <Button
+                  type="button"
+                  variant="destructive"
+                  size="icon"
+                  onClick={() => removeEntry(index)}
+                >
+                  X
+                </Button>
+              )}
             </div>
-          </div>
+          ))}
+          {showAlert && (
+            <Alert variant="destructive">
+              <AlertTitle>Error</AlertTitle>
+              <AlertDescription>
+                Total hours must be exactly 8 hours.
+              </AlertDescription>
+            </Alert>
+          )}
 
           <div className="flex gap-4 mt-4">
+            {totalHours < 8 && (
+              <Button type="button" onClick={addEntry}>
+                Add Project
+              </Button>
+            )}
             <Button onClick={handleSubmit}>Add Time Entry</Button>
           </div>
         </CardContent>
