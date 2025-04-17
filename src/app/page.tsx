@@ -37,6 +37,7 @@ import {
   isSameDay,
   parseISO,
   getWeek,
+  isWeekend,
 } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
@@ -64,10 +65,11 @@ export default function Home() {
   const [alertMessage, setAlertMessage] = useState(""); // State to control the alert
   const [editMode, setEditMode] = useState(false); // Track if the form is in edit mode
   const [isSubmitted, setIsSubmitted] = useState(false); // Track if the form is submitted
+  const [showCalendar, setShowCalendar] = useState(true);
 
   const today = new Date();
-  const startOfCurrentWeek = startOfWeek(today);
-  const endOfCurrentWeek = endOfWeek(today);
+  const startOfCurrentWeek = startOfWeek(today, { weekStartsOn: 1 }); // set the start of week to monday
+  const endOfCurrentWeek = endOfWeek(today, { weekStartsOn: 1 });
 
   const isValidDate = (date: Date) => {
     return isWithinInterval(date, {
@@ -101,6 +103,7 @@ export default function Home() {
     setTotalHours(0);
     setIsSubmitted(false);
     setEditMode(false);
+    setShowCalendar(true);
 
     const dateStr = format(date, "yyyy-MM-dd");
     const existingEntries = timeEntries.filter(entry => entry.date === dateStr);
@@ -170,6 +173,7 @@ export default function Home() {
     setEntries([]); // Reset entries to initial state
     setEditMode(false); // Reset edit mode
     setTotalHours(0)
+    setShowCalendar(false);
 
     toast({
       title: "Success",
@@ -181,6 +185,7 @@ export default function Home() {
   const handleEdit = () => {
     setEditMode(true);
     setIsSubmitted(false);
+    setShowCalendar(true);
     const dateStr = format(date, "yyyy-MM-dd");
     const existingEntries = timeEntries.filter(entry => entry.date === dateStr);
     if (existingEntries.length > 0) {
@@ -206,13 +211,13 @@ export default function Home() {
 
   const weeklySummaryData = useMemo(() => {
     const weeklySummary: { [key: string]: { [day: string]: number } } = {};
-    const start = startOfWeek(date);
+    const start = startOfWeek(date, { weekStartsOn: 1 });
     const end = date;
 
     timeEntries.forEach((entry) => {
       const entryDate = parseISO(entry.date);
       if (isWithinInterval(entryDate, { start, end })) {
-        const day = format(entryDate, "EEE");
+        const day = format(entryDate, "EEE", {weekStartsOn: 1});
         const key = `${entry.project}`;
 
         if (!weeklySummary[key]) {
@@ -340,11 +345,15 @@ export default function Home() {
   };
 
   const isWeekCompleted = () => {
-    const currentDate = new Date();
-    const start = startOfWeek(currentDate);
+    const currentDate = new Date(date);
+    const start = startOfWeek(currentDate, { weekStartsOn: 1 }); // week starts on monday
     let dateToCheck = new Date(start);
   
     while (dateToCheck <= currentDate) {
+       if (isWeekend(dateToCheck)) {
+        dateToCheck.setDate(dateToCheck.getDate() + 1);
+        continue; // Skip weekends
+      }
       const dateStr = format(dateToCheck, "yyyy-MM-dd");
       const hasEntries = timeEntries.some(entry => entry.date === dateStr);
       if (!hasEntries) {
@@ -369,19 +378,22 @@ export default function Home() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="date">Date</Label>
-                  <Calendar
-                    id="date"
-                    mode="single"
-                    selected={date}
-                    onSelect={setDate}
-                    className="rounded-md border"
-                    disabledDays={
-                      !isValidDate(date) && {
-                        before: startOfCurrentWeek,
-                        after: today,
-                      }
-                    }
-                  />
+                    {showCalendar &&(
+                        <Calendar
+                            id="date"
+                            mode="single"
+                            selected={date}
+                            onSelect={setDate}
+                            className="rounded-md border"
+                            disabledDays={[
+                                ...(!isValidDate(date) ? [{
+                                    before: startOfCurrentWeek,
+                                    after: today,
+                                }] : []),
+                                { daysOfWeek: [0, 6] },
+                            ]}
+                        />
+                    )}
                   {!isValidDate(date) && (
                     <Alert variant="destructive">
                       <AlertTitle>Invalid Date</AlertTitle>
@@ -391,6 +403,14 @@ export default function Home() {
                       </AlertDescription>
                     </Alert>
                   )}
+                   {isWeekend(date) && (
+                      <Alert variant="destructive">
+                        <AlertTitle>Weekend Date</AlertTitle>
+                        <AlertDescription>
+                          You cannot select weekends.
+                        </AlertDescription>
+                      </Alert>
+                    )}
                 </div>
               </div>
               {entries.map((entry, index) => (
@@ -459,14 +479,14 @@ export default function Home() {
                     Add Project
                   </Button>
                 )}
-                <Button onClick={handleSubmit} disabled={!isValidDate(date)}>
+                <Button onClick={handleSubmit} disabled={!isValidDate(date) || isWeekend(date)}>
                   Add Time Entry
                 </Button>
               </div>
             </>
           
 
-         {isWeekCompleted() &&  (
+         {isWeekCompleted() && !showCalendar && (
             <>
               <Alert>
                 <AlertTitle>Time entry submitted</AlertTitle>
