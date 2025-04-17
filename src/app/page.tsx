@@ -376,6 +376,12 @@ export default function Home() {
 
   return (
     <div className="container mx-auto py-10 px-4">
+       {!isWeekCompleted() && (
+        <Alert variant="warning">
+          <AlertTitle>Incomplete Time Entries</AlertTitle>
+          <AlertDescription>Please fill out time entries for all previous days this week.</AlertDescription>
+        </Alert>
+      )}
       <Card>
         <CardHeader>
           <CardTitle>Daily Time Entry</CardTitle>
@@ -528,12 +534,7 @@ export default function Home() {
         title="Monthly Time Summary"
         description="Grouped summary of hours worked this month."
       />
-       {!isWeekCompleted() && (
-        <Alert variant="warning">
-          <AlertTitle>Incomplete Time Entries</AlertTitle>
-          <AlertDescription>Please fill out time entries for all previous days this week.</AlertDescription>
-        </Alert>
-      )}
     </div>
   );
 }
+
