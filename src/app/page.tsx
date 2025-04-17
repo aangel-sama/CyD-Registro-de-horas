@@ -45,6 +45,7 @@ type Entry = {
   id: string;
   project: string;
   hours: number;
+  date: string;
 };
 
 type SummaryType = "daily" | "weekly" | "monthly";
@@ -61,8 +62,8 @@ export default function Home() {
   const [totalHours, setTotalHours] = useState(0);
   const [showAlert, setShowAlert] = useState(false); // State to control the alert
   const [alertMessage, setAlertMessage] = useState(""); // State to control the alert
-  const [isSubmitted, setIsSubmitted] = useState(false); // Track if the form is submitted
   const [editMode, setEditMode] = useState(false); // Track if the form is in edit mode
+  const [isSubmitted, setIsSubmitted] = useState(false); // Track if the form is submitted
 
   const today = new Date();
   const startOfCurrentWeek = startOfWeek(today);
@@ -81,11 +82,6 @@ export default function Home() {
     if (storedTimeEntries) {
       setTimeEntries(JSON.parse(storedTimeEntries));
     }
-
-    // Clear local storage and reset entries on component unmount
-    return () => {
-      localStorage.removeItem('timeEntries');
-    };
   }, []);
 
   useEffect(() => {
@@ -112,21 +108,27 @@ export default function Home() {
       // Load existing entries into the entries state for editing
       setEntries(existingEntries.map(entry => ({ project: entry.project, hours: entry.hours })));
       setEditMode(true);
-      setIsSubmitted(true);
-
     }
   }, [date, timeEntries]);
 
   const addEntry = () => {
-    // Check if total hours are already 8
     if (totalHours >= 8) {
       setShowAlert(true);
       setAlertMessage("You have already added 8 hours.");
       return;
     }
-
-    setEntries((prev) => [...prev, { project: projects[0], hours: 0 }]);
+    setEntries((prev) => {
+      // If the last entry has hours less than 8, create a new entry with remaining hours
+      const lastEntry = prev[prev.length - 1];
+      if (lastEntry && lastEntry.hours < 8) {
+        return [...prev]; // Return the existing state without adding a new entry
+      } else {
+        // Add a new entry with 0 hours initially
+        return [...prev, { project: projects[0], hours: 0 }];
+      }
+    });
   };
+
 
   const updateEntry = (index: number, field: string, value: any) => {
     setEntries((prev) => {
@@ -165,6 +167,8 @@ export default function Home() {
     } else {
       setTimeEntries([...timeEntries, ...newTimeEntries]);
     }
+
+    localStorage.setItem('timeEntries', JSON.stringify([...timeEntries, ...newTimeEntries]));
 
     setIsSubmitted(true); // Set submitted status to true
     setEntries([]); // Reset entries to initial state
@@ -364,7 +368,7 @@ export default function Home() {
           <CardDescription>Record your time spent on each project.</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4">
-          {!isSubmitted ? (
+          
             <>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
@@ -460,11 +464,13 @@ export default function Home() {
                   </Button>
                 )}
                 <Button onClick={handleSubmit} disabled={!isValidDate(date)}>
-                  {editMode ? "Update Time Entry" : "Add Time Entry"}
+                  Add Time Entry
                 </Button>
               </div>
             </>
-          ) : (
+          
+
+         {isWeekCompleted() &&  (
             <>
               <Alert>
                 <AlertTitle>Time entry submitted</AlertTitle>
@@ -474,7 +480,7 @@ export default function Home() {
               </Alert>
               <Button onClick={handleEdit}>Edit Time Entry</Button>
             </>
-          )}
+         )}
         </CardContent>
       </Card>
 
@@ -497,7 +503,7 @@ export default function Home() {
         title="Monthly Time Summary"
         description="Grouped summary of hours worked this month."
       />
-        {isWeekCompleted() ? null : (
+       {!isWeekCompleted() && (
         <Alert variant="warning">
           <AlertTitle>Incomplete Time Entries</AlertTitle>
           <AlertDescription>Please fill out time entries for all previous days this week.</AlertDescription>
@@ -506,4 +512,3 @@ export default function Home() {
     </div>
   );
 }
-
