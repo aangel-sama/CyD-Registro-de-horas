@@ -96,6 +96,24 @@ export default function Home() {
     localStorage.setItem('timeEntries', JSON.stringify(timeEntries));
   }, [timeEntries]);
 
+  useEffect(() => {
+    // Clear entries when the date changes
+    setEntries([]);
+    setTotalHours(0);
+    setIsSubmitted(false);
+    setEditMode(false);
+
+    const dateStr = format(date, "yyyy-MM-dd");
+    const existingEntries = timeEntries.filter(entry => entry.date === dateStr);
+    if (existingEntries.length > 0) {
+      // Load existing entries into the entries state for editing
+      setEntries(existingEntries.map(entry => ({ project: entry.project, hours: entry.hours })));
+      setEditMode(true);
+      setIsSubmitted(true);
+
+    }
+  }, [date, timeEntries]);
+
   const addEntry = () => {
     // Check if total hours are already 8
     if (totalHours >= 8) {
@@ -439,7 +457,7 @@ export default function Home() {
                   </Button>
                 )}
                 <Button onClick={handleSubmit} disabled={!isValidDate(date)}>
-                  Add Time Entry
+                  {editMode ? "Update Time Entry" : "Add Time Entry"}
                 </Button>
               </div>
             </>
