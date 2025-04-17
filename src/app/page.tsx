@@ -78,10 +78,23 @@ export default function Home() {
   };
 
   useEffect(() => {
+    // Load time entries from local storage on component mount
+    const storedTimeEntries = localStorage.getItem('timeEntries');
+    if (storedTimeEntries) {
+      setTimeEntries(JSON.parse(storedTimeEntries));
+    }
+  }, []);
+
+  useEffect(() => {
     // Recalculate total hours whenever entries change
     const newTotalHours = entries.reduce((sum, entry) => sum + entry.hours, 0);
     setTotalHours(newTotalHours);
   }, [entries]);
+
+  useEffect(() => {
+    // Save time entries to local storage whenever timeEntries changes
+    localStorage.setItem('timeEntries', JSON.stringify(timeEntries));
+  }, [timeEntries]);
 
   const addEntry = () => {
     // Check if total hours are already 8
@@ -122,10 +135,18 @@ export default function Home() {
       hours: entry.hours,
     }));
 
-    setTimeEntries([...timeEntries, ...newTimeEntries]);
+    // If in edit mode, replace the entries for the selected date
+    if (editMode) {
+      const dateStr = format(date, "yyyy-MM-dd");
+      setTimeEntries((prev) =>
+        prev.filter((entry) => entry.date !== dateStr).concat(newTimeEntries)
+      );
+    } else {
+      setTimeEntries([...timeEntries, ...newTimeEntries]);
+    }
+
     setIsSubmitted(true); // Set submitted status to true
     setEntries([]); // Reset entries to initial state
-    setDate(new Date()); // Reset date to current date
     setEditMode(false); // Reset edit mode
     setTotalHours(0)
 
@@ -135,9 +156,19 @@ export default function Home() {
     });
   };
 
+
   const handleEdit = () => {
     setEditMode(true);
     setIsSubmitted(false);
+    const dateStr = format(date, "yyyy-MM-dd");
+    const existingEntries = timeEntries.filter(entry => entry.date === dateStr);
+    if (existingEntries.length > 0) {
+      // Load existing entries into the entries state for editing
+      setEntries(existingEntries.map(entry => ({ project: entry.project, hours: entry.hours })));
+    } else {
+      // If no entries exist for the date, initialize with empty entries
+      setEntries([{ project: projects[0], hours: 0 }]);
+    }
   };
 
   const dailySummaryData = useMemo(() => {
@@ -287,6 +318,23 @@ export default function Home() {
     );
   };
 
+  const isWeekCompleted = () => {
+    const currentDate = new Date();
+    const start = startOfWeek(currentDate);
+    let dateToCheck = new Date(start);
+  
+    while (dateToCheck <= currentDate) {
+      const dateStr = format(dateToCheck, "yyyy-MM-dd");
+      const hasEntries = timeEntries.some(entry => entry.date === dateStr);
+      if (!hasEntries) {
+        return false;
+      }
+      dateToCheck.setDate(dateToCheck.getDate() + 1);
+    }
+    return true;
+  };
+  
+
   return (
     <div className="container mx-auto py-10 px-4">
       <Card>
@@ -428,6 +476,12 @@ export default function Home() {
         title="Monthly Time Summary"
         description="Grouped summary of hours worked this month."
       />
+        {isWeekCompleted() ? null : (
+        <Alert variant="warning">
+          <AlertTitle>Incomplete Time Entries</AlertTitle>
+          <AlertDescription>Please fill out time entries for all previous days this week.</AlertDescription>
+        </Alert>
+      )}
     </div>
   );
 }
