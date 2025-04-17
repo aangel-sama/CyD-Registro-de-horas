@@ -36,6 +36,7 @@ import {
   isWithinInterval,
   isSameDay,
   parseISO,
+  getWeek,
 } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
@@ -56,13 +57,14 @@ export default function Home() {
   const [date, setDate] = useState<Date>(new Date());
   const [entries, setEntries] = useState<
     { project: string; hours: number }[]
-  >([{ project: projects[0], hours: 0 }]); // Start with one entry
+  >([]);
   const [timeEntries, setTimeEntries] = useState<Entry[]>([]);
   const [totalHours, setTotalHours] = useState(0);
   const [showAlert, setShowAlert] = useState(false); // State to control the alert
   const [alertMessage, setAlertMessage] = useState(""); // State to control the alert
   const [isSubmitted, setIsSubmitted] = useState(false); // Track if the form is submitted
   const [editMode, setEditMode] = useState(false); // Track if the form is in edit mode
+  const [selectedProject, setSelectedProject] = useState(""); // Track the selected project
 
   const today = new Date();
   const startOfCurrentWeek = startOfWeek(today);
@@ -82,7 +84,13 @@ export default function Home() {
   }, [entries]);
 
   const addEntry = () => {
-    //Add time entry
+    // Check if total hours are already 8
+    if (totalHours >= 8) {
+      setShowAlert(true);
+      setAlertMessage("You have already added 8 hours.");
+      return;
+    }
+
     setEntries((prev) => [...prev, { project: projects[0], hours: 0 }]);
   };
 
@@ -116,9 +124,10 @@ export default function Home() {
 
     setTimeEntries([...timeEntries, ...newTimeEntries]);
     setIsSubmitted(true); // Set submitted status to true
-    setEntries([{ project: projects[0], hours: 0 }]); // Reset entries to initial state
+    setEntries([]); // Reset entries to initial state
     setDate(new Date()); // Reset date to current date
     setEditMode(false); // Reset edit mode
+    setTotalHours(0)
 
     toast({
       title: "Success",
@@ -315,7 +324,6 @@ export default function Home() {
                   )}
                 </div>
               </div>
-
               {entries.map((entry, index) => (
                 <div
                   key={index}
@@ -355,7 +363,7 @@ export default function Home() {
                           updateEntry(index, "hours", value);
                         }
                       }}
-                      pattern="^[0-9]+(\.[0-9]{1,2})?$"
+                      pattern="^[0-9]+(\\.[0-9]{1,2})?$"
                     />
                   </div>
                   {entries.length > 1 && (
@@ -376,7 +384,6 @@ export default function Home() {
                   <AlertDescription>{alertMessage}</AlertDescription>
                 </Alert>
               )}
-
               <div className="flex gap-4 mt-4">
                 {totalHours < 8 && (
                   <Button type="button" onClick={addEntry}>
