@@ -120,12 +120,8 @@ export default function Home() {
     setEntries((prev) => {
       // If the last entry has hours less than 8, create a new entry with remaining hours
       const lastEntry = prev[prev.length - 1];
-      if (lastEntry && lastEntry.hours < 8) {
-        return [...prev]; // Return the existing state without adding a new entry
-      } else {
         // Add a new entry with 0 hours initially
         return [...prev, { project: projects[0], hours: 0 }];
-      }
     });
   };
 
