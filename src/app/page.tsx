@@ -21,7 +21,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Separator } from "@/components/ui/separator";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -63,7 +62,8 @@ export default function Home() {
   const [timeEntries, setTimeEntries] = useState<Entry[]>([]);
   const [totalHours, setTotalHours] = useState(0);
   const [showAlert, setShowAlert] = useState(false); // State to control the alert
-  const [alertMessage, setAlertMessage] = useState(""); // State to control the alert message
+  const [alertMessage, setAlertMessage] = useState(""); // State to control the alert
+  const [isSubmitted, setIsSubmitted] = useState(false); // Track if the form is submitted
 
   useEffect(() => {
     // Recalculate total hours whenever entries change
@@ -89,36 +89,33 @@ export default function Home() {
   };
 
   const handleSubmit = () => {
-    if (totalHours < 8) {
+    if (totalHours !== 8) {
       setShowAlert(true); // Show the alert message
-      setAlertMessage("Total hours must be at least 8 hours.");
-      return;
-    }
-
-    if (totalHours > 8) {
-      setShowAlert(true); // Show the alert message
-      setAlertMessage("Total hours must be at most 8 hours.");
+      setAlertMessage("Total hours must be exactly 8 hours.");
       return;
     }
 
     setShowAlert(false); // Ensure alert is hidden if conditions are met
 
-    entries.forEach((entry) => {
-      const newEntry: Entry = {
-        id: Date.now().toString(),
-        date: format(date, "yyyy-MM-dd"),
-        project: entry.project,
-        hours: entry.hours,
-      };
-      setTimeEntries((prev) => [...prev, newEntry]);
-    });
+    const newTimeEntries = entries.map((entry) => ({
+      id: Date.now().toString(),
+      date: format(date, "yyyy-MM-dd"),
+      project: entry.project,
+      hours: entry.hours,
+    }));
 
-    setEntries([{ project: projects[0], hours: 0 }]);
-    setDate(new Date());
+    setTimeEntries(newTimeEntries);
+    setIsSubmitted(true); // Set submitted status to true
+    setEntries([{ project: projects[0], hours: 0 }]); // Reset entries to initial state
+    setDate(new Date()); // Reset date to current date
     toast({
       title: "Success",
       description: "Time entry added successfully.",
     });
+  };
+
+  const handleEdit = () => {
+    setIsSubmitted(false);
   };
 
   const dailySummaryData = useMemo(() => {
@@ -276,90 +273,104 @@ export default function Home() {
           <CardDescription>Record your time spent on each project.</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="date">Date</Label>
-              <Calendar
-                id="date"
-                mode="single"
-                selected={date}
-                onSelect={setDate}
-                className="rounded-md border"
-              />
-            </div>
-          </div>
+          {!isSubmitted ? (
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="date">Date</Label>
+                  <Calendar
+                    id="date"
+                    mode="single"
+                    selected={date}
+                    onSelect={setDate}
+                    className="rounded-md border"
+                  />
+                </div>
+              </div>
 
-          {entries.map((entry, index) => (
-            <div
-              key={index}
-              className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center"
-            >
-              <div>
-                <Label htmlFor={`project-${index}`}>Project</Label>
-                <Select
-                  id={`project-${index}`}
-                  onValueChange={(value) =>
-                    updateEntry(index, "project", value)
-                  }
-                  defaultValue={entry.project}
+              {entries.map((entry, index) => (
+                <div
+                  key={index}
+                  className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center"
                 >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select project" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {projects.map((p) => (
-                      <SelectItem key={p} value={p}>
-                        {p}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label htmlFor={`hours-${index}`}>Hours Worked</Label>
-                <Input
-                  type="number"
-                  id={`hours-${index}`}
-                  placeholder="Enter hours"
-                  value={entry.hours.toString()}
-                  onChange={(e) => {
-                    const value = Number(e.target.value);
-                    if (!isNaN(value)) {
-                      updateEntry(index, "hours", value);
-                    }
-                  }}
-                  pattern="^[0-9]+(\.[0-9]{1,2})?$"
-                />
-              </div>
-              {entries.length > 1 && (
-                <Button
-                  type="button"
-                  variant="destructive"
-                  size="icon"
-                  onClick={() => removeEntry(index)}
-                >
-                  X
-                </Button>
+                  <div>
+                    <Label htmlFor={`project-${index}`}>Project</Label>
+                    <Select
+                      id={`project-${index}`}
+                      onValueChange={(value) =>
+                        updateEntry(index, "project", value)
+                      }
+                      defaultValue={entry.project}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select project" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {projects.map((p) => (
+                          <SelectItem key={p} value={p}>
+                            {p}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label htmlFor={`hours-${index}`}>Hours Worked</Label>
+                    <Input
+                      type="number"
+                      id={`hours-${index}`}
+                      placeholder="Enter hours"
+                      value={entry.hours.toString()}
+                      onChange={(e) => {
+                        const value = Number(e.target.value);
+                        if (!isNaN(value) && value >= 0) {
+                          updateEntry(index, "hours", value);
+                        }
+                      }}
+                      pattern="^[0-9]+(\.[0-9]{1,2})?$"
+                    />
+                  </div>
+                  {entries.length > 1 && (
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="icon"
+                      onClick={() => removeEntry(index)}
+                    >
+                      X
+                    </Button>
+                  )}
+                </div>
+              ))}
+              {showAlert && (
+                <Alert variant="destructive">
+                  <AlertTitle>Error</AlertTitle>
+                  <AlertDescription>
+                    {alertMessage}
+                  </AlertDescription>
+                </Alert>
               )}
-            </div>
-          ))}
-          {showAlert && (
-            <Alert variant="destructive">
-              <AlertTitle>Error</AlertTitle>
-              <AlertDescription>
-                {alertMessage}
-              </AlertDescription>
-            </Alert>
-          )}
 
-          <div className="flex gap-4 mt-4">
-            {totalHours < 8 && (
-              <Button type="button" onClick={addEntry}>
-                Add Project
-              </Button>
-            )}
-            <Button onClick={handleSubmit}>Add Time Entry</Button>
-          </div>
+              <div className="flex gap-4 mt-4">
+                {totalHours < 8 && (
+                  <Button type="button" onClick={addEntry}>
+                    Add Project
+                  </Button>
+                )}
+                <Button onClick={handleSubmit}>Add Time Entry</Button>
+              </div>
+            </>
+          ) : (
+            <>
+              <Alert>
+                <AlertTitle>Time entry submitted</AlertTitle>
+                <AlertDescription>
+                  You have submitted your time entry for today.
+                </AlertDescription>
+              </Alert>
+              <Button onClick={handleEdit}>Edit Time Entry</Button>
+            </>
+          )}
         </CardContent>
       </Card>
 
