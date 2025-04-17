@@ -3,18 +3,31 @@
 import { useState, useEffect, useMemo } from "react";
 import { Calendar } from "@/components/ui/calendar";
 import {
-  Card, CardContent, CardDescription, CardHeader, CardTitle
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
 } from "@/components/ui/table";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@/components/ui/select";
 import {
   format,
@@ -33,6 +46,7 @@ type Entry = {
   date: string;
   project: string;
   hours: number;
+  document?: string;
 };
 
 type SummaryType = "daily" | "weekly" | "monthly";
@@ -43,12 +57,9 @@ export default function Home() {
   const [projects] = useState(["Project A", "Project B", "Project C"]);
   const [date, setDate] = useState<Date>(new Date());
   const [project, setProject] = useState(projects[0]);
-  const [hours, setHours] = useState<number | undefined>(8);
+  const [hours, setHours] = useState<number | undefined>(null);
   const [timeEntries, setTimeEntries] = useState<Entry[]>([]);
-
-  useEffect(() => {
-    setTimeEntries([]);
-  }, []);
+  const [document, setDocument] = useState<string | undefined>(undefined);
 
   const handleSubmit = () => {
     if (!date || !project || hours === undefined || hours === null) {
@@ -60,11 +71,19 @@ export default function Home() {
       return;
     }
 
-    if (hours !== 8) {
+    const todayStr = format(date, "yyyy-MM-dd");
+    const dailyHours = timeEntries.filter(
+      (entry) => entry.date === todayStr
+    ).reduce((sum, entry) => sum + entry.hours, 0);
+
+    if (dailyHours + hours > 8) {
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Please enter exactly 8 hours.",
+        description:
+          "You can only add up to 8 hours per day. You have already added " +
+          dailyHours +
+          " hours today.",
       });
       return;
     }
@@ -74,11 +93,13 @@ export default function Home() {
       date: format(date, "yyyy-MM-dd"),
       project,
       hours,
+      document,
     };
 
-    setTimeEntries(prev => [...prev, newEntry]);
+    setTimeEntries((prev) => [...prev, newEntry]);
     setDate(new Date());
-    setHours(8);
+    setHours(null);
+    setDocument(undefined);
 
     toast({
       title: "Success",
@@ -90,8 +111,8 @@ export default function Home() {
     const dailySummary: { [key: string]: number } = {};
     const todayStr = format(new Date(), "yyyy-MM-dd");
     timeEntries.forEach((entry) => {
-      const key = `${entry.project}`;
       if (entry.date === todayStr) {
+        const key = `${entry.project} - ${entry.document || "N/A"}`;
         dailySummary[key] = (dailySummary[key] || 0) + entry.hours;
       }
     });
@@ -107,11 +128,12 @@ export default function Home() {
       const entryDate = parseISO(entry.date);
       if (isWithinInterval(entryDate, { start, end })) {
         const day = format(entryDate, "EEE");
-        const key = `${entry.project}`;
+        const key = `${entry.project} - ${entry.document || "N/A"}`;
 
         if (!weeklySummary[key]) {
           weeklySummary[key] = {};
         }
+
         weeklySummary[key][day] = (weeklySummary[key][day] || 0) + entry.hours;
       }
     });
@@ -126,15 +148,18 @@ export default function Home() {
 
     timeEntries.forEach((entry) => {
       const entryDate = parseISO(entry.date);
-      if (isWithinInterval(entryDate, { start: startOfMonth, end: endOfMonth })) {
+      if (
+        isWithinInterval(entryDate, { start: startOfMonth, end: endOfMonth })
+      ) {
         const weekNumber = getWeek(entryDate, { weekStartsOn: 1 });
-        const key = `${entry.project}`;
+        const key = `${entry.project} - ${entry.document || "N/A"}`;
 
         if (!monthlySummary[key]) {
           monthlySummary[key] = {};
         }
 
-        monthlySummary[key][`Week ${weekNumber}`] = (monthlySummary[key][`Week ${weekNumber}`] || 0) + entry.hours;
+        monthlySummary[key][`Week ${weekNumber}`] =
+          (monthlySummary[key][`Week ${weekNumber}`] || 0) + entry.hours;
       }
     });
     return monthlySummary;
@@ -149,15 +174,6 @@ export default function Home() {
     title: string;
     description: string;
   }) => {
-    const now = new Date();
-
-    const isRelevant = (entryDate: Date) => {
-      if (type === "daily") return isSameDay(entryDate, now);
-      if (type === "weekly") return isSameWeek(entryDate, now);
-      if (type === "monthly") return isSameMonth(entryDate, now);
-      return false;
-    };
-
     return (
       <Card>
         <CardHeader>
@@ -206,10 +222,19 @@ export default function Home() {
                 <TableCell colSpan={type === "daily" ? 1 : 2}>Total</TableCell>
                 <TableCell>
                   {type === "daily"
-                    ? Object.values(dailySummaryData).reduce((sum, hours) => sum + hours, 0)
+                    ? Object.values(dailySummaryData).reduce(
+                        (sum, hours) => sum + hours,
+                        0
+                      )
                     : type === "weekly"
-                      ? Object.values(weeklySummaryData).reduce((sum, days) => sum + Object.values(days).reduce((daySum, dayHours) => daySum + dayHours, 0), 0)
-                      : Object.values(monthlySummaryData).reduce((sum, weeks) => sum + Object.values(weeks).reduce((weekSum, weekHours) => weekSum + weekHours, 0), 0)}
+                    ? Object.values(weeklySummaryData).reduce(
+                        (sum, days) => sum + Object.values(days).reduce((daySum, dayHours) => daySum + dayHours, 0),
+                        0
+                      )
+                    : Object.values(monthlySummaryData).reduce(
+                        (sum, weeks) => sum + Object.values(weeks).reduce((weekSum, weekHours) => weekSum + weekHours, 0),
+                        0
+                      )}
                 </TableCell>
               </TableRow>
             </TableBody>
@@ -241,9 +266,15 @@ export default function Home() {
             <div>
               <Label htmlFor="project">Project</Label>
               <Select onValueChange={setProject} defaultValue={project}>
-                <SelectTrigger><SelectValue placeholder="Select project" /></SelectTrigger>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select project" />
+                </SelectTrigger>
                 <SelectContent>
-                  {projects.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+                  {projects.map((p) => (
+                    <SelectItem key={p} value={p}>
+                      {p}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -255,10 +286,11 @@ export default function Home() {
               <Input
                 type="number"
                 id="hours"
-                value={hours !== undefined ? hours.toString() : ""}
+                placeholder="Enter hours"
+                value={hours !== null && hours !== undefined ? hours.toString() : ""}
                 onChange={(e) => {
                   const value = Number(e.target.value);
-                  setHours(isNaN(value) ? undefined : value);
+                  setHours(isNaN(value) ? null : value);
                 }}
               />
             </div>
