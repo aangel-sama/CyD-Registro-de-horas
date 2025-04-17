@@ -43,7 +43,6 @@ import { Badge } from "@/components/ui/badge";
 
 type Entry = {
   id: string;
-  date: string;
   project: string;
   hours: number;
 };
@@ -64,7 +63,6 @@ export default function Home() {
   const [alertMessage, setAlertMessage] = useState(""); // State to control the alert
   const [isSubmitted, setIsSubmitted] = useState(false); // Track if the form is submitted
   const [editMode, setEditMode] = useState(false); // Track if the form is in edit mode
-  const [selectedProject, setSelectedProject] = useState(""); // Track the selected project
 
   const today = new Date();
   const startOfCurrentWeek = startOfWeek(today);
@@ -83,6 +81,11 @@ export default function Home() {
     if (storedTimeEntries) {
       setTimeEntries(JSON.parse(storedTimeEntries));
     }
+
+    // Clear local storage and reset entries on component unmount
+    return () => {
+      localStorage.removeItem('timeEntries');
+    };
   }, []);
 
   useEffect(() => {
@@ -503,3 +506,4 @@ export default function Home() {
     </div>
   );
 }
+
