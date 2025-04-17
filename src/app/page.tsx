@@ -38,6 +38,7 @@ import {
   parseISO,
   getWeek,
   isWeekend,
+  getDay,
 } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
@@ -209,29 +210,29 @@ export default function Home() {
     return dailySummary;
   }, [timeEntries, date]);
 
-  const weeklySummaryData = useMemo(() => {
-    const weeklySummary: { [key: string]: { [day: string]: number } } = {};
+ const weeklySummaryData = useMemo(() => {
+    const weeklySummary: { [day: string]: { [project: string]: number } } = {};
     const start = startOfWeek(date, { weekStartsOn: 1 });
     const end = date;
 
     timeEntries.forEach((entry) => {
       const entryDate = parseISO(entry.date);
       if (isWithinInterval(entryDate, { start, end })) {
-        const day = format(entryDate, "EEE", {weekStartsOn: 1});
-        const key = `${entry.project}`;
+        const day = format(entryDate, "EEE", { weekStartsOn: 1 });
+        const project = entry.project;
 
-        if (!weeklySummary[key]) {
-          weeklySummary[key] = {};
+        if (!weeklySummary[day]) {
+          weeklySummary[day] = {};
         }
 
-        weeklySummary[key][day] = (weeklySummary[key][day] || 0) + entry.hours;
+        weeklySummary[day][project] = (weeklySummary[day][project] || 0) + entry.hours;
       }
     });
     return weeklySummary;
   }, [timeEntries, date]);
 
   const monthlySummaryData = useMemo(() => {
-    const monthlySummary: { [key: string]: { [week: string]: number } } = {};
+    const monthlySummary: { [week: string]: { [project: string]: number } } = {};
     const today = new Date();
     const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
     const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
@@ -242,14 +243,15 @@ export default function Home() {
         isWithinInterval(entryDate, { start: startOfMonth, end: endOfMonth })
       ) {
         const weekNumber = getWeek(entryDate, { weekStartsOn: 1 });
-        const key = `${entry.project}`;
+        const week = `Week ${weekNumber}`;
+        const project = entry.project;
 
-        if (!monthlySummary[key]) {
-          monthlySummary[key] = {};
+        if (!monthlySummary[week]) {
+          monthlySummary[week] = {};
         }
 
-        monthlySummary[key][`Week ${weekNumber}`] =
-          (monthlySummary[key][`Week ${weekNumber}`] || 0) + entry.hours;
+        monthlySummary[week][project] =
+          (monthlySummary[week][project] || 0) + entry.hours;
       }
     });
     return monthlySummary;
@@ -274,9 +276,9 @@ export default function Home() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Project</TableHead>
                 {type === "weekly" && <TableHead>Day</TableHead>}
                 {type === "monthly" && <TableHead>Week</TableHead>}
+                <TableHead>Project</TableHead>
                 <TableHead>Hours</TableHead>
               </TableRow>
             </TableHeader>
@@ -289,21 +291,21 @@ export default function Home() {
                   </TableRow>
                 ))}
               {type === "weekly" &&
-                Object.entries(weeklySummaryData).map(([project, days]) => (
-                  Object.entries(days).map(([day, hours]) => (
-                    <TableRow key={`${project}-${day}`}>
-                      <TableCell>{project}</TableCell>
+                Object.entries(weeklySummaryData).map(([day, projects]) => (
+                  Object.entries(projects).map(([project, hours]) => (
+                    <TableRow key={`${day}-${project}`}>
                       <TableCell>{day}</TableCell>
+                      <TableCell>{project}</TableCell>
                       <TableCell>{hours}</TableCell>
                     </TableRow>
                   ))
                 ))}
               {type === "monthly" &&
-                Object.entries(monthlySummaryData).map(([project, weeks]) => (
-                  Object.entries(weeks).map(([week, hours]) => (
-                    <TableRow key={`${project}-${week}`}>
-                      <TableCell>{project}</TableCell>
+                Object.entries(monthlySummaryData).map(([week, projects]) => (
+                  Object.entries(projects).map(([project, hours]) => (
+                    <TableRow key={`${week}-${project}`}>
                       <TableCell>{week}</TableCell>
+                      <TableCell>{project}</TableCell>
                       <TableCell>{hours}</TableCell>
                     </TableRow>
                   ))
