@@ -202,18 +202,24 @@ export default function Home() {
     let dailySummary: { [key: string]: number } = {};
     const todayStr = format(date, "yyyy-MM-dd");
     timeEntries.forEach((entry) => {
-      if (entry.date === todayStr) {
         const key = `${entry.project}`;
+      if (entry.date === todayStr) {
         dailySummary[key] = (dailySummary[key] || 0) + entry.hours;
       }
     });
     return dailySummary;
   }, [timeEntries, date]);
 
- const weeklySummaryData = useMemo(() => {
+  const weeklySummaryData = useMemo(() => {
     const weeklySummary: { [day: string]: { [project: string]: number } } = {};
     const start = startOfWeek(date, { weekStartsOn: 1 });
-    const end = date;
+    const end = endOfWeek(date, { weekStartsOn: 1 });
+
+    const daysOfWeek = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
+
+    daysOfWeek.forEach(day => {
+      weeklySummary[day] = {};
+    });
 
     timeEntries.forEach((entry) => {
       const entryDate = parseISO(entry.date);
@@ -221,17 +227,16 @@ export default function Home() {
         const day = format(entryDate, "EEE", { weekStartsOn: 1 });
         const project = entry.project;
 
-        if (!weeklySummary[day]) {
-          weeklySummary[day] = {};
+        if (daysOfWeek.includes(day)) {
+          weeklySummary[day][project] = (weeklySummary[day][project] || 0) + entry.hours;
         }
-
-        weeklySummary[day][project] = (weeklySummary[day][project] || 0) + entry.hours;
       }
     });
     return weeklySummary;
   }, [timeEntries, date]);
 
-  const monthlySummaryData = useMemo(() => {
+
+ const monthlySummaryData = useMemo(() => {
     const monthlySummary: { [week: string]: { [project: string]: number } } = {};
     const today = new Date();
     const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
@@ -292,12 +297,14 @@ export default function Home() {
                 ))}
               {type === "weekly" &&
                 Object.entries(weeklySummaryData).map(([day, projects]) => (
-                  Object.entries(projects).map(([project, hours]) => (
+                    Object.entries(projects).map(([project, hours]) => (
+                      hours > 0 && (
                     <TableRow key={`${day}-${project}`}>
                       <TableCell>{day}</TableCell>
                       <TableCell>{project}</TableCell>
                       <TableCell>{hours}</TableCell>
                     </TableRow>
+                      )
                   ))
                 ))}
               {type === "monthly" &&
