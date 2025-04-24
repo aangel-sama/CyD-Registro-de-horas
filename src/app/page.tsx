@@ -1,39 +1,53 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Calendar } from "@/components/ui/calendar";
 import {
-  Card, CardContent, CardDescription, CardHeader, CardTitle
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
 } from "@/components/ui/table";
 import { Separator } from "@/components/ui/separator";
-import { Textarea } from "@/components/ui/textarea";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@/components/ui/select";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   format,
   startOfWeek,
-  getWeek,
+  endOfWeek,
+  isWithinInterval,
   isSameDay,
-  isSameWeek,
-  isSameMonth,
-  parseISO
+  parseISO,
+  getWeek,
+  isWeekend,
+  getDay,
 } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
+import { Badge } from "@/components/ui/badge";
 
 type Entry = {
   id: string;
-  date: string;
   project: string;
-  document: string;
   hours: number;
-  description?: string;
+  date: string;
 };
 
 type SummaryType = "daily" | "weekly" | "monthly";
@@ -41,78 +55,212 @@ type SummaryType = "daily" | "weekly" | "monthly";
 export default function Home() {
   const { toast } = useToast();
 
-  const [projects] = useState(["Project A", "Project B", "Project C"]);
-  const [documents] = useState(["Document 1", "Document 2", "Document 3"]);
-
+  const [projects] = useState(["Proyecto A", "Proyecto B", "Proyecto C"]);
   const [date, setDate] = useState<Date>(new Date());
-  const [project, setProject] = useState(projects[0]);
-  const [document, setDocument] = useState(documents[0]);
-  const [hours, setHours] = useState<number>(8);
-  const [description, setDescription] = useState("");
-
+  const [entries, setEntries] = useState<
+    { project: string; hours: number }[]
+  >([]);
   const [timeEntries, setTimeEntries] = useState<Entry[]>([]);
+  const [totalHours, setTotalHours] = useState(0);
+  const [showAlert, setShowAlert] = useState(false); // State to control the alert
+  const [alertMessage, setAlertMessage] = useState(""); // State to control the alert
+  const [editMode, setEditMode] = useState(false); // Track if the form is in edit mode
+  const [isSubmitted, setIsSubmitted] = useState(false); // Track if the form is submitted
+  const [showCalendar, setShowCalendar] = useState(true);
+
+  const today = new Date();
+  const startOfCurrentWeek = startOfWeek(today, { weekStartsOn: 1 }); // set the start of week to monday
+  const endOfCurrentWeek = endOfWeek(today, { weekStartsOn: 1 });
+
+  const isValidDate = (date: Date) => {
+    return isWithinInterval(date, {
+      start: startOfCurrentWeek,
+      end: today,
+    });
+  };
 
   useEffect(() => {
-    setTimeEntries([]); // Aquí podrías cargar desde Firebase u otra fuente
+    // Cargar entradas de tiempo desde el almacenamiento local al montar el componente
+    const storedTimeEntries = localStorage.getItem('timeEntries');
+    if (storedTimeEntries) {
+      setTimeEntries(JSON.parse(storedTimeEntries));
+    }
   }, []);
 
+  useEffect(() => {
+    // Recalcular el total de horas cada vez que cambian las entradas
+    const newTotalHours = entries.reduce((sum, entry) => sum + entry.hours, 0);
+    setTotalHours(newTotalHours);
+  }, [entries]);
+
+  useEffect(() => {
+    // Guardar entradas de tiempo en el almacenamiento local cada vez que cambian las entradas de tiempo
+    localStorage.setItem('timeEntries', JSON.stringify(timeEntries));
+  }, [timeEntries]);
+
+  useEffect(() => {
+    // Limpiar entradas cuando cambia la fecha
+    setEntries([]);
+    setTotalHours(0);
+    setIsSubmitted(false);
+    setEditMode(false);
+    setShowCalendar(true);
+
+    const dateStr = format(date, "yyyy-MM-dd");
+    const existingEntries = timeEntries.filter(entry => entry.date === dateStr);
+    if (existingEntries.length > 0) {
+      // Cargar las entradas existentes en el estado de entradas para editar
+      setEntries(existingEntries.map(entry => ({ project: entry.project, hours: entry.hours })));
+      setEditMode(true);
+    }
+  }, [date, timeEntries]);
+
+  const addEntry = () => {
+    if (totalHours >= 8) {
+      setShowAlert(true);
+      setAlertMessage("Ya has añadido 8 horas.");
+      return;
+    }
+    setEntries((prev) => {
+      // Si la última entrada tiene horas menores a 8, crea una nueva entrada con las horas restantes
+      const lastEntry = prev[prev.length - 1];
+        // Añadir una nueva entrada con 0 horas inicialmente
+        return [...prev, { project: projects[0], hours: 0 }];
+    });
+  };
+
+
+  const updateEntry = (index: number, field: string, value: any) => {
+    setEntries((prev) => {
+      const newEntries = [...prev];
+      newEntries[index] = { ...newEntries[index], [field]: value };
+      return newEntries;
+    });
+  };
+
+  const removeEntry = (index: number) => {
+    setEntries((prev) => prev.filter((_, i) => i !== index));
+  };
+
   const handleSubmit = () => {
-    if (!date || !project || !document || !hours) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Please fill in all fields.",
-      });
+    if (totalHours !== 8) {
+      setShowAlert(true); // Mostrar el mensaje de alerta
+      setAlertMessage("El total de horas debe ser exactamente 8 horas.");
       return;
     }
 
-    const newEntry: Entry = {
+    setShowAlert(false); // Asegurar que la alerta esté oculta si se cumplen las condiciones
+
+    const newTimeEntries = entries.map((entry) => ({
       id: Date.now().toString(),
       date: format(date, "yyyy-MM-dd"),
-      project,
-      document,
-      hours,
-      description,
-    };
+      project: entry.project,
+      hours: entry.hours,
+    }));
 
-    setTimeEntries(prev => [...prev, newEntry]);
-    setDate(new Date());
-    setHours(8);
-    setDescription("");
+    // Si está en modo de edición, reemplazar las entradas para la fecha seleccionada
+    if (editMode) {
+      const dateStr = format(date, "yyyy-MM-dd");
+      setTimeEntries((prev) =>
+        prev.filter((entry) => entry.date !== dateStr).concat(newTimeEntries)
+      );
+    } else {
+      setTimeEntries([...timeEntries, ...newTimeEntries]);
+    }
+
+    localStorage.setItem('timeEntries', JSON.stringify([...timeEntries, ...newTimeEntries]));
+
+    setIsSubmitted(true); // Establecer el estado de enviado a verdadero
+    setEntries([]); // Restablecer las entradas al estado inicial
+    setEditMode(false); // Restablecer el modo de edición
+    setTotalHours(0)
+    setShowCalendar(false);
 
     toast({
-      title: "Success",
-      description: "Time entry added successfully.",
+      title: "Éxito",
+      description: "Entrada de tiempo añadida exitosamente.",
     });
   };
 
-  const getGroupedSummaryData = (type: SummaryType) => {
-    const now = new Date();
-    const summary: { [key: string]: { hours: number; descriptions: string[] } } = {};
 
-    timeEntries.forEach(entry => {
-      const entryDate = parseISO(entry.date);
+  const handleEdit = () => {
+    setEditMode(true);
+    setIsSubmitted(false);
+    setShowCalendar(true);
+    const dateStr = format(date, "yyyy-MM-dd");
+    const existingEntries = timeEntries.filter(entry => entry.date === dateStr);
+    if (existingEntries.length > 0) {
+      // Cargar las entradas existentes en el estado de entradas para editar
+      setEntries(existingEntries.map(entry => ({ project: entry.project, hours: entry.hours })));
+    } else {
+      // Si no existen entradas para la fecha, inicializar con entradas vacías
+      setEntries([{ project: projects[0], hours: 0 }]);
+    }
+  };
 
-      const include =
-        (type === "weekly" && isSameWeek(entryDate, now)) ||
-        (type === "monthly" && isSameMonth(entryDate, now));
-
-      if (!include) return;
-
-      let key = `${entry.project}-${entry.document}`;
-      if (type === "weekly") key += `-${format(entryDate, "EEE")}`;
-      if (type === "monthly") key += `-Semana ${getWeek(entryDate)}`;
-
-      if (!summary[key]) {
-        summary[key] = { hours: 0, descriptions: [] };
+  const dailySummaryData = useMemo(() => {
+    let dailySummary: { [key: string]: number } = {};
+    const todayStr = format(date, "yyyy-MM-dd");
+    timeEntries.forEach((entry) => {
+        const key = `${entry.project}`;
+      if (entry.date === todayStr) {
+        dailySummary[key] = (dailySummary[key] || 0) + entry.hours;
       }
+    });
+    return dailySummary;
+  }, [timeEntries, date]);
 
-      summary[key].hours += entry.hours;
-      if (entry.description) summary[key].descriptions.push(entry.description);
+  const weeklySummaryData = useMemo(() => {
+    const weeklySummary: { [day: string]: { [project: string]: number } } = {};
+    const start = startOfWeek(date, { weekStartsOn: 1 });
+    const end = endOfWeek(date, { weekStartsOn: 1 });
+
+    const daysOfWeek = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
+
+    daysOfWeek.forEach(day => {
+      weeklySummary[day] = {};
     });
 
-    return summary;
-  };
+    timeEntries.forEach((entry) => {
+      const entryDate = parseISO(entry.date);
+      if (isWithinInterval(entryDate, { start, end })) {
+        const day = format(entryDate, "EEE", { weekStartsOn: 1 });
+        const project = entry.project;
+
+        if (daysOfWeek.includes(day)) {
+          weeklySummary[day][project] = (weeklySummary[day][project] || 0) + entry.hours;
+        }
+      }
+    });
+    return weeklySummary;
+  }, [timeEntries, date]);
+
+
+ const monthlySummaryData = useMemo(() => {
+    const monthlySummary: { [week: string]: { [project: string]: number } } = {};
+    const today = new Date();
+    const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+
+    timeEntries.forEach((entry) => {
+      const entryDate = parseISO(entry.date);
+      if (
+        isWithinInterval(entryDate, { start: startOfMonth, end: endOfMonth })
+      ) {
+        const weekNumber = getWeek(entryDate, { weekStartsOn: 1 });
+        const week = `Semana ${weekNumber}`;
+        const project = entry.project;
+
+        if (!monthlySummary[week]) {
+          monthlySummary[week] = {};
+        }
+
+        monthlySummary[week][project] =
+          (monthlySummary[week][project] || 0) + entry.hours;
+      }
+    });
+    return monthlySummary;
+  }, [timeEntries]);
 
   const SummaryCard = ({
     type,
@@ -123,15 +271,6 @@ export default function Home() {
     title: string;
     description: string;
   }) => {
-    const now = new Date();
-
-    const isRelevant = (entryDate: Date) => {
-      if (type === "daily") return isSameDay(entryDate, now);
-      if (type === "weekly") return isSameWeek(entryDate, now);
-      if (type === "monthly") return isSameMonth(entryDate, now);
-      return false;
-    };
-
     return (
       <Card>
         <CardHeader>
@@ -142,52 +281,70 @@ export default function Home() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Project</TableHead>
-                <TableHead>Document</TableHead>
-                <TableHead>Hours</TableHead>
-                <TableHead>Description</TableHead>
+                {type === "weekly" && <TableHead>Día</TableHead>}
+                {type === "monthly" && <TableHead>Semana</TableHead>}
+                <TableHead>Proyecto</TableHead>
+                <TableHead>Horas</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {type === "daily" ? (
-                // Mostrar cada entrada individual (no agrupada)
-                timeEntries
-                  .filter(entry => isRelevant(parseISO(entry.date)))
-                  .map(entry => (
-                    <TableRow key={entry.id}>
-                      <TableCell>{entry.project}</TableCell>
-                      <TableCell>{entry.document}</TableCell>
-                      <TableCell>{entry.hours}</TableCell>
-                      <TableCell>{entry.description}</TableCell>
+              {type === "daily" &&
+                Object.entries(dailySummaryData).map(([project, hours]) => (
+                  <TableRow key={project}>
+                    <TableCell>{project}</TableCell>
+                    <TableCell>{hours}</TableCell>
+                  </TableRow>
+                ))}
+              {type === "weekly" &&
+                Object.entries(weeklySummaryData).map(([day, projects]) => (
+                    Object.entries(projects).map(([project, hours]) => (
+                      hours > 0 && (
+                    <TableRow key={`${day}-${project}`}>
+                      <TableCell>{day}</TableCell>
+                      <TableCell>{project}</TableCell>
+                      <TableCell>{hours}</TableCell>
+                    </TableRow>
+                      )
+                  ))
+                ))}
+              {type === "monthly" &&
+                Object.entries(monthlySummaryData).map(([week, projects]) => (
+                  Object.entries(projects).map(([project, hours]) => (
+                    <TableRow key={`${week}-${project}`}>
+                      <TableCell>{week}</TableCell>
+                      <TableCell>{project}</TableCell>
+                      <TableCell>{hours}</TableCell>
                     </TableRow>
                   ))
-              ) : (
-                // Agrupar en semanal y mensual
-                Object.entries(getGroupedSummaryData(type)).map(([key, data]) => {
-                  const [proj, doc, label] = key.split("-");
-                  return (
-                    <TableRow key={key}>
-                      <TableCell>{proj}</TableCell>
-                      <TableCell>{doc}</TableCell>
-                      <TableCell>{data.hours}</TableCell>
-                      <TableCell>
-                        {label ? `${label}: ` : ""}
-                        {data.descriptions.join(", ")}
-                      </TableCell>
-                    </TableRow>
-                  );
-                })
-              )}
+                ))}
               <TableRow>
-                <TableCell colSpan={2}>Total</TableCell>
+                <TableCell colSpan={type === "daily" ? 1 : 2}>Total</TableCell>
                 <TableCell>
                   {type === "daily"
-                    ? timeEntries
-                        .filter(entry => isRelevant(parseISO(entry.date)))
-                        .reduce((sum, e) => sum + e.hours, 0)
-                    : Object.values(getGroupedSummaryData(type)).reduce((sum, d) => sum + d.hours, 0)}
+                    ? Object.values(dailySummaryData).reduce(
+                        (sum, hours) => sum + hours,
+                        0
+                      )
+                    : type === "weekly"
+                    ? Object.values(weeklySummaryData).reduce(
+                        (sum, days) =>
+                          sum +
+                          Object.values(days).reduce(
+                            (daySum, dayHours) => daySum + dayHours,
+                            0
+                          ),
+                        0
+                      )
+                    : Object.values(monthlySummaryData).reduce(
+                        (sum, weeks) =>
+                          sum +
+                          Object.values(weeks).reduce(
+                            (weekSum, weekHours) => weekSum + weekHours,
+                            0
+                          ),
+                        0
+                      )}
                 </TableCell>
-                <TableCell />
               </TableRow>
             </TableBody>
           </Table>
@@ -196,68 +353,164 @@ export default function Home() {
     );
   };
 
+  const isWeekCompleted = () => {
+    const currentDate = new Date(date);
+    const start = startOfWeek(currentDate, { weekStartsOn: 1 }); // week starts on monday
+    let dateToCheck = new Date(start);
+  
+    while (dateToCheck <= currentDate) {
+       if (isWeekend(dateToCheck)) {
+        dateToCheck.setDate(dateToCheck.getDate() + 1);
+        continue; // Skip weekends
+      }
+      const dateStr = format(dateToCheck, "yyyy-MM-dd");
+      const hasEntries = timeEntries.some(entry => entry.date === dateStr);
+      if (!hasEntries) {
+        return false;
+      }
+      dateToCheck.setDate(dateToCheck.getDate() + 1);
+    }
+    return true;
+  };
+  
+
   return (
     <div className="container mx-auto py-10 px-4">
+       {!isWeekCompleted() && (
+        <Alert variant="warning">
+          <AlertTitle>Entradas de Tiempo Incompletas</AlertTitle>
+          <AlertDescription>Por favor, completa las entradas de tiempo para todos los días anteriores de esta semana.</AlertDescription>
+        </Alert>
+      )}
       <Card>
         <CardHeader>
-          <CardTitle>Daily Time Entry</CardTitle>
-          <CardDescription>Record your time spent on each project.</CardDescription>
+          <CardTitle>Entrada de Tiempo Diaria</CardTitle>
+          <CardDescription>Registra tu tiempo dedicado a cada proyecto.</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="date">Date</Label>
-              <Calendar
-                id="date"
-                mode="single"
-                selected={date}
-                onSelect={setDate}
-                className="rounded-md border"
-              />
-            </div>
-            <div>
-              <Label htmlFor="project">Project</Label>
-              <Select onValueChange={setProject} defaultValue={project}>
-                <SelectTrigger><SelectValue placeholder="Select project" /></SelectTrigger>
-                <SelectContent>
-                  {projects.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
+          
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="date">Fecha</Label>
+                    {showCalendar &&(
+                        <Calendar
+                            id="date"
+                            mode="single"
+                            selected={date}
+                            onSelect={setDate}
+                            className="rounded-md border"
+                            disabledDays={[
+                                ...(!isValidDate(date) ? [{
+                                    before: startOfCurrentWeek,
+                                    after: today,
+                                }] : []),
+                                { daysOfWeek: [0, 6] },
+                            ]}
+                        />
+                    )}
+                  {!isValidDate(date) && (
+                    <Alert variant="destructive">
+                      <AlertTitle>Fecha Inválida</AlertTitle>
+                      <AlertDescription>
+                        Solo puedes seleccionar fechas desde el inicio de la semana actual hasta hoy.
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                   {isWeekend(date) && (
+                      <Alert variant="destructive">
+                        <AlertTitle>Fecha de Fin de Semana</AlertTitle>
+                        <AlertDescription>
+                          No puedes seleccionar fines de semana.
+                        </AlertDescription>
+                      </Alert>
+                    )}
+                </div>
+              </div>
+              {entries.map((entry, index) => (
+                <div
+                  key={index}
+                  className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center"
+                >
+                  <div>
+                    <Label htmlFor={`project-${index}`}>Proyecto</Label>
+                    <Select
+                      id={`project-${index}`}
+                      onValueChange={(value) =>
+                        updateEntry(index, "project", value)
+                      }
+                      defaultValue={entry.project}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Seleccionar proyecto" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {projects.map((p) => (
+                          <SelectItem key={p} value={p}>
+                            {p}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label htmlFor={`hours-${index}`}>Horas Trabajadas</Label>
+                    <Input
+                      type="number"
+                      id={`hours-${index}`}
+                      placeholder="Ingresar horas"
+                      value={entry.hours.toString()}
+                      onChange={(e) => {
+                        const value = Number(e.target.value);
+                        if (!isNaN(value) && value >= 0) {
+                          updateEntry(index, "hours", value);
+                        }
+                      }}
+                      pattern="^[0-9]+(\\.[0-9]{1,2})?$"
+                    />
+                  </div>
+                  {entries.length > 1 && (
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="icon"
+                      onClick={() => removeEntry(index)}
+                    >
+                      X
+                    </Button>
+                  )}
+                </div>
+              ))}
+              {showAlert && (
+                <Alert variant="destructive">
+                  <AlertTitle>Error</AlertTitle>
+                  <AlertDescription>{alertMessage}</AlertDescription>
+                </Alert>
+              )}
+              <div className="flex gap-4 mt-4">
+                {totalHours < 8 && (
+                  <Button type="button" onClick={addEntry}>
+                    Añadir Proyecto
+                  </Button>
+                )}
+                <Button onClick={handleSubmit} disabled={!isValidDate(date) || isWeekend(date)}>
+                  Añadir Entrada de Tiempo
+                </Button>
+              </div>
+            </>
+          
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="document">Document/Plan</Label>
-              <Select onValueChange={setDocument} defaultValue={document}>
-                <SelectTrigger><SelectValue placeholder="Select document" /></SelectTrigger>
-                <SelectContent>
-                  {documents.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label htmlFor="hours">Hours Worked</Label>
-              <Input
-                type="number"
-                id="hours"
-                value={hours}
-                onChange={(e) => setHours(Number(e.target.value))}
-              />
-            </div>
-          </div>
-
-          <div>
-            <Label htmlFor="description">Description</Label>
-            <Textarea
-              id="description"
-              placeholder="Enter task description"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-            />
-          </div>
-
-          <Button onClick={handleSubmit}>Add Time Entry</Button>
+         {isWeekCompleted() && !showCalendar && (
+            <>
+              <Alert>
+                <AlertTitle>Entrada de tiempo enviada</AlertTitle>
+                <AlertDescription>
+                  Has enviado tu entrada de tiempo para hoy.
+                </AlertDescription>
+              </Alert>
+              <Button onClick={handleEdit}>Editar Entrada de Tiempo</Button>
+            </>
+         )}
         </CardContent>
       </Card>
 
@@ -265,21 +518,23 @@ export default function Home() {
 
       <SummaryCard
         type="daily"
-        title="Daily Time Summary"
-        description="Summary of individual tasks logged today."
+        title="Resumen de Tiempo Diario"
+        description="Resumen de horas trabajadas hoy."
       />
       <Separator className="my-6" />
       <SummaryCard
         type="weekly"
-        title="Weekly Time Summary"
-        description="Grouped summary of hours worked this week."
+        title="Resumen de Tiempo Semanal"
+        description="Resumen agrupado de horas trabajadas esta semana."
       />
       <Separator className="my-6" />
       <SummaryCard
         type="monthly"
-        title="Monthly Time Summary"
-        description="Grouped summary of hours worked this month."
+        title="Resumen de Tiempo Mensual"
+        description="Resumen agrupado de horas trabajadas este mes."
       />
     </div>
   );
 }
+
+
