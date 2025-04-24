@@ -55,7 +55,7 @@ type SummaryType = "daily" | "weekly" | "monthly";
 export default function Home() {
   const { toast } = useToast();
 
-  const [projects] = useState(["Project A", "Project B", "Project C"]);
+  const [projects] = useState(["Proyecto A", "Proyecto B", "Proyecto C"]);
   const [date, setDate] = useState<Date>(new Date());
   const [entries, setEntries] = useState<
     { project: string; hours: number }[]
@@ -80,7 +80,7 @@ export default function Home() {
   };
 
   useEffect(() => {
-    // Load time entries from local storage on component mount
+    // Cargar entradas de tiempo desde el almacenamiento local al montar el componente
     const storedTimeEntries = localStorage.getItem('timeEntries');
     if (storedTimeEntries) {
       setTimeEntries(JSON.parse(storedTimeEntries));
@@ -88,18 +88,18 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    // Recalculate total hours whenever entries change
+    // Recalcular el total de horas cada vez que cambian las entradas
     const newTotalHours = entries.reduce((sum, entry) => sum + entry.hours, 0);
     setTotalHours(newTotalHours);
   }, [entries]);
 
   useEffect(() => {
-    // Save time entries to local storage whenever timeEntries changes
+    // Guardar entradas de tiempo en el almacenamiento local cada vez que cambian las entradas de tiempo
     localStorage.setItem('timeEntries', JSON.stringify(timeEntries));
   }, [timeEntries]);
 
   useEffect(() => {
-    // Clear entries when the date changes
+    // Limpiar entradas cuando cambia la fecha
     setEntries([]);
     setTotalHours(0);
     setIsSubmitted(false);
@@ -109,7 +109,7 @@ export default function Home() {
     const dateStr = format(date, "yyyy-MM-dd");
     const existingEntries = timeEntries.filter(entry => entry.date === dateStr);
     if (existingEntries.length > 0) {
-      // Load existing entries into the entries state for editing
+      // Cargar las entradas existentes en el estado de entradas para editar
       setEntries(existingEntries.map(entry => ({ project: entry.project, hours: entry.hours })));
       setEditMode(true);
     }
@@ -118,13 +118,13 @@ export default function Home() {
   const addEntry = () => {
     if (totalHours >= 8) {
       setShowAlert(true);
-      setAlertMessage("You have already added 8 hours.");
+      setAlertMessage("Ya has añadido 8 horas.");
       return;
     }
     setEntries((prev) => {
-      // If the last entry has hours less than 8, create a new entry with remaining hours
+      // Si la última entrada tiene horas menores a 8, crea una nueva entrada con las horas restantes
       const lastEntry = prev[prev.length - 1];
-        // Add a new entry with 0 hours initially
+        // Añadir una nueva entrada con 0 horas inicialmente
         return [...prev, { project: projects[0], hours: 0 }];
     });
   };
@@ -144,12 +144,12 @@ export default function Home() {
 
   const handleSubmit = () => {
     if (totalHours !== 8) {
-      setShowAlert(true); // Show the alert message
-      setAlertMessage("Total hours must be exactly 8 hours.");
+      setShowAlert(true); // Mostrar el mensaje de alerta
+      setAlertMessage("El total de horas debe ser exactamente 8 horas.");
       return;
     }
 
-    setShowAlert(false); // Ensure alert is hidden if conditions are met
+    setShowAlert(false); // Asegurar que la alerta esté oculta si se cumplen las condiciones
 
     const newTimeEntries = entries.map((entry) => ({
       id: Date.now().toString(),
@@ -158,7 +158,7 @@ export default function Home() {
       hours: entry.hours,
     }));
 
-    // If in edit mode, replace the entries for the selected date
+    // Si está en modo de edición, reemplazar las entradas para la fecha seleccionada
     if (editMode) {
       const dateStr = format(date, "yyyy-MM-dd");
       setTimeEntries((prev) =>
@@ -170,15 +170,15 @@ export default function Home() {
 
     localStorage.setItem('timeEntries', JSON.stringify([...timeEntries, ...newTimeEntries]));
 
-    setIsSubmitted(true); // Set submitted status to true
-    setEntries([]); // Reset entries to initial state
-    setEditMode(false); // Reset edit mode
+    setIsSubmitted(true); // Establecer el estado de enviado a verdadero
+    setEntries([]); // Restablecer las entradas al estado inicial
+    setEditMode(false); // Restablecer el modo de edición
     setTotalHours(0)
     setShowCalendar(false);
 
     toast({
-      title: "Success",
-      description: "Time entry added successfully.",
+      title: "Éxito",
+      description: "Entrada de tiempo añadida exitosamente.",
     });
   };
 
@@ -190,10 +190,10 @@ export default function Home() {
     const dateStr = format(date, "yyyy-MM-dd");
     const existingEntries = timeEntries.filter(entry => entry.date === dateStr);
     if (existingEntries.length > 0) {
-      // Load existing entries into the entries state for editing
+      // Cargar las entradas existentes en el estado de entradas para editar
       setEntries(existingEntries.map(entry => ({ project: entry.project, hours: entry.hours })));
     } else {
-      // If no entries exist for the date, initialize with empty entries
+      // Si no existen entradas para la fecha, inicializar con entradas vacías
       setEntries([{ project: projects[0], hours: 0 }]);
     }
   };
@@ -248,7 +248,7 @@ export default function Home() {
         isWithinInterval(entryDate, { start: startOfMonth, end: endOfMonth })
       ) {
         const weekNumber = getWeek(entryDate, { weekStartsOn: 1 });
-        const week = `Week ${weekNumber}`;
+        const week = `Semana ${weekNumber}`;
         const project = entry.project;
 
         if (!monthlySummary[week]) {
@@ -281,10 +281,10 @@ export default function Home() {
           <Table>
             <TableHeader>
               <TableRow>
-                {type === "weekly" && <TableHead>Day</TableHead>}
-                {type === "monthly" && <TableHead>Week</TableHead>}
-                <TableHead>Project</TableHead>
-                <TableHead>Hours</TableHead>
+                {type === "weekly" && <TableHead>Día</TableHead>}
+                {type === "monthly" && <TableHead>Semana</TableHead>}
+                <TableHead>Proyecto</TableHead>
+                <TableHead>Horas</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -378,21 +378,21 @@ export default function Home() {
     <div className="container mx-auto py-10 px-4">
        {!isWeekCompleted() && (
         <Alert variant="warning">
-          <AlertTitle>Incomplete Time Entries</AlertTitle>
-          <AlertDescription>Please fill out time entries for all previous days this week.</AlertDescription>
+          <AlertTitle>Entradas de Tiempo Incompletas</AlertTitle>
+          <AlertDescription>Por favor, completa las entradas de tiempo para todos los días anteriores de esta semana.</AlertDescription>
         </Alert>
       )}
       <Card>
         <CardHeader>
-          <CardTitle>Daily Time Entry</CardTitle>
-          <CardDescription>Record your time spent on each project.</CardDescription>
+          <CardTitle>Entrada de Tiempo Diaria</CardTitle>
+          <CardDescription>Registra tu tiempo dedicado a cada proyecto.</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4">
           
             <>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="date">Date</Label>
+                  <Label htmlFor="date">Fecha</Label>
                     {showCalendar &&(
                         <Calendar
                             id="date"
@@ -411,18 +411,17 @@ export default function Home() {
                     )}
                   {!isValidDate(date) && (
                     <Alert variant="destructive">
-                      <AlertTitle>Invalid Date</AlertTitle>
+                      <AlertTitle>Fecha Inválida</AlertTitle>
                       <AlertDescription>
-                        You can only select dates from the current week up to
-                        today.
+                        Solo puedes seleccionar fechas desde el inicio de la semana actual hasta hoy.
                       </AlertDescription>
                     </Alert>
                   )}
                    {isWeekend(date) && (
                       <Alert variant="destructive">
-                        <AlertTitle>Weekend Date</AlertTitle>
+                        <AlertTitle>Fecha de Fin de Semana</AlertTitle>
                         <AlertDescription>
-                          You cannot select weekends.
+                          No puedes seleccionar fines de semana.
                         </AlertDescription>
                       </Alert>
                     )}
@@ -434,7 +433,7 @@ export default function Home() {
                   className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center"
                 >
                   <div>
-                    <Label htmlFor={`project-${index}`}>Project</Label>
+                    <Label htmlFor={`project-${index}`}>Proyecto</Label>
                     <Select
                       id={`project-${index}`}
                       onValueChange={(value) =>
@@ -443,7 +442,7 @@ export default function Home() {
                       defaultValue={entry.project}
                     >
                       <SelectTrigger>
-                        <SelectValue placeholder="Select project" />
+                        <SelectValue placeholder="Seleccionar proyecto" />
                       </SelectTrigger>
                       <SelectContent>
                         {projects.map((p) => (
@@ -455,11 +454,11 @@ export default function Home() {
                     </Select>
                   </div>
                   <div>
-                    <Label htmlFor={`hours-${index}`}>Hours Worked</Label>
+                    <Label htmlFor={`hours-${index}`}>Horas Trabajadas</Label>
                     <Input
                       type="number"
                       id={`hours-${index}`}
-                      placeholder="Enter hours"
+                      placeholder="Ingresar horas"
                       value={entry.hours.toString()}
                       onChange={(e) => {
                         const value = Number(e.target.value);
@@ -491,11 +490,11 @@ export default function Home() {
               <div className="flex gap-4 mt-4">
                 {totalHours < 8 && (
                   <Button type="button" onClick={addEntry}>
-                    Add Project
+                    Añadir Proyecto
                   </Button>
                 )}
                 <Button onClick={handleSubmit} disabled={!isValidDate(date) || isWeekend(date)}>
-                  Add Time Entry
+                  Añadir Entrada de Tiempo
                 </Button>
               </div>
             </>
@@ -504,12 +503,12 @@ export default function Home() {
          {isWeekCompleted() && !showCalendar && (
             <>
               <Alert>
-                <AlertTitle>Time entry submitted</AlertTitle>
+                <AlertTitle>Entrada de tiempo enviada</AlertTitle>
                 <AlertDescription>
-                  You have submitted your time entry for today.
+                  Has enviado tu entrada de tiempo para hoy.
                 </AlertDescription>
               </Alert>
-              <Button onClick={handleEdit}>Edit Time Entry</Button>
+              <Button onClick={handleEdit}>Editar Entrada de Tiempo</Button>
             </>
          )}
         </CardContent>
@@ -519,22 +518,23 @@ export default function Home() {
 
       <SummaryCard
         type="daily"
-        title="Daily Time Summary"
-        description="Summary of hours worked today."
+        title="Resumen de Tiempo Diario"
+        description="Resumen de horas trabajadas hoy."
       />
       <Separator className="my-6" />
       <SummaryCard
         type="weekly"
-        title="Weekly Time Summary"
-        description="Grouped summary of hours worked this week."
+        title="Resumen de Tiempo Semanal"
+        description="Resumen agrupado de horas trabajadas esta semana."
       />
       <Separator className="my-6" />
       <SummaryCard
         type="monthly"
-        title="Monthly Time Summary"
-        description="Grouped summary of hours worked this month."
+        title="Resumen de Tiempo Mensual"
+        description="Resumen agrupado de horas trabajadas este mes."
       />
     </div>
   );
 }
+
 
